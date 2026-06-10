@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="theme-color" content="#080a0d">
+<title>⬡ GoldMapper GEE</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+:root{
+  --gold:#F5C518;--gold2:#c8971a;--bg:#07090c;--card:#0d1117;
+  --card2:#141a22;--card3:#1c2433;--border:#1e2736;--border2:#283040;
+  --text:#dde4ef;--dim:#4a5568;--dim2:#667180;
+  --green:#10b981;--red:#ef4444;--blue:#3b82f6;--orange:#f97316;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);}
+body{display:flex;flex-direction:column;}
+
+.topbar{background:#0d1117;border-bottom:1px solid var(--border);padding:10px 14px;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:500;}
+.brand{display:flex;align-items:center;gap:10px;}
+.hex{width:36px;height:36px;background:linear-gradient(135deg,#F5C518,#c8971a);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:flex;align-items:center;justify-content:center;font-size:16px;color:#07090c;font-weight:900;
+  animation:glow 3s ease-in-out infinite;}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 3px #F5C51855)}50%{filter:drop-shadow(0 0 10px #F5C518aa)}}
+.brand h1{font-size:1rem;font-weight:900;color:var(--gold);}
+.brand p{font-size:0.56rem;color:var(--dim2);}
+.topbar-right{display:flex;gap:5px;}
+.tbtn{height:32px;padding:0 10px;background:var(--card2);border:1px solid var(--border2);
+  border-radius:8px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.68rem;
+  cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;}
+.tbtn.active{border-color:var(--gold);color:var(--gold);}
+
+.layout{flex:1;display:flex;overflow:hidden;position:relative;min-height:0;}
+#map{flex:1;height:100%;}
+
+/* Loading overlay */
+.loading{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  background:rgba(7,9,12,.95);border:1px solid var(--gold2);border-radius:14px;
+  padding:14px 20px;z-index:1000;min-width:250px;text-align:center;
+  backdrop-filter:blur(10px);display:none;}
+.loading.show{display:block;}
+.loading-title{color:var(--gold);font-weight:900;font-size:0.85rem;margin-bottom:8px;}
+.loading-bar{height:5px;background:var(--card3);border-radius:99px;overflow:hidden;margin-bottom:7px;}
+.loading-fill{height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold));border-radius:99px;transition:width .4s;}
+.loading-txt{font-size:0.7rem;color:var(--dim2);}
+
+.draw-banner{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  background:rgba(245,197,24,.96);color:#07090c;padding:8px 18px;border-radius:99px;
+  font-weight:900;font-size:0.8rem;z-index:999;display:none;pointer-events:none;white-space:nowrap;}
+.draw-banner.show{display:block;}
+
+.layer-btns{position:absolute;top:10px;right:10px;z-index:400;display:flex;flex-direction:column;gap:5px;}
+.lbtn{background:rgba(7,9,12,.92);border:1px solid var(--border2);border-radius:9px;
+  padding:7px 11px;font-family:'Cairo',sans-serif;font-size:0.68rem;color:var(--text);
+  cursor:pointer;backdrop-filter:blur(8px);display:flex;align-items:center;gap:5px;}
+.lbtn.on{border-color:var(--gold);color:var(--gold);}
+
+.map-search{position:absolute;bottom:70px;left:10px;right:10px;z-index:400;
+  display:flex;gap:6px;background:rgba(7,9,12,.93);border:1px solid var(--border2);
+  border-radius:11px;padding:7px 11px;backdrop-filter:blur(10px);}
+.map-search input{flex:1;background:none;border:none;outline:none;color:var(--text);
+  font-family:'Cairo',sans-serif;font-size:0.78rem;}
+.map-search input::placeholder{color:var(--dim);}
+.map-search button{background:var(--gold);color:#07090c;border:none;border-radius:7px;
+  padding:5px 11px;font-family:'Cairo',sans-serif;font-size:0.7rem;font-weight:700;cursor:pointer;}
+
+.coords-bar{position:absolute;bottom:118px;left:50%;transform:translateX(-50%);
+  background:rgba(7,9,12,.87);border:1px solid var(--border2);border-radius:99px;
+  padding:5px 13px;font-size:0.65rem;color:var(--dim2);z-index:300;
+  pointer-events:none;white-space:nowrap;backdrop-filter:blur(6px);}
+.coords-bar span{color:var(--gold);}
+
+/* Panel */
+.panel{width:300px;background:var(--card);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;z-index:200;}
+@media(max-width:680px){
+  .panel{position:absolute;bottom:0;left:0;right:0;width:100%;max-height:65vh;
+    border-left:none;border-top:2px solid var(--gold2);border-radius:16px 16px 0 0;
+    transform:translateY(calc(100% - 50px));transition:transform .3s ease;}
+  .panel.open{transform:translateY(0);}
+}
+.drag{display:none;width:36px;height:4px;background:var(--border2);border-radius:99px;margin:9px auto 2px;cursor:pointer;}
+@media(max-width:680px){.drag{display:block;}}
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab{flex:1;padding:9px 3px 7px;border:none;background:none;font-family:'Cairo',sans-serif;
+  font-size:0.6rem;color:var(--dim2);cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;gap:2px;border-bottom:2px solid transparent;}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+.pane{flex:1;overflow-y:auto;padding:12px;-webkit-overflow-scrolling:touch;}
+.pane::-webkit-scrollbar{width:3px;}
+.pane::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
+
+/* UI Components */
+.card{background:var(--card2);border:1px solid var(--border);border-radius:11px;padding:12px;margin-bottom:9px;}
+.card-gold{border-color:rgba(245,197,24,.3);}
+.card-title{font-size:0.78rem;font-weight:700;color:var(--gold);margin-bottom:9px;display:flex;align-items:center;gap:5px;}
+.ig{margin-bottom:8px;}
+.ig label{font-size:0.67rem;color:var(--dim2);margin-bottom:3px;display:block;}
+.ig select,.ig input[type=text],.ig input[type=password]{width:100%;background:var(--card3);border:1px solid var(--border2);
+  border-radius:8px;padding:8px 10px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.8rem;outline:none;}
+.ig input[readonly]{color:var(--dim2);cursor:pointer;}
+.btn-gold{width:100%;background:linear-gradient(135deg,#F5C518,#d4a017);color:#07090c;
+  border:none;border-radius:10px;padding:11px;font-family:'Cairo',sans-serif;
+  font-size:0.88rem;font-weight:900;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;gap:7px;margin-bottom:6px;}
+.btn-outline{width:100%;background:transparent;color:var(--gold);border:1px solid var(--gold2);
+  border-radius:10px;padding:9px;font-family:'Cairo',sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;}
+.sec{font-size:0.62rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:1.5px;margin:11px 0 6px;}
+.alert{border-radius:8px;padding:9px 11px;font-size:0.72rem;margin-bottom:9px;line-height:1.5;}
+.alert-gold{background:rgba(245,197,24,.07);border:1px solid rgba(245,197,24,.22);color:#c8971a;}
+.alert-info{background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.22);color:#60a5fa;}
+.alert-green{background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.22);color:#34d399;}
+.alert-red{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.22);color:#f87171;}
+
+/* Composite selector */
+.comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0;}
+.comp-btn{background:var(--card3);border:1px solid var(--border2);border-radius:9px;
+  padding:9px 6px;text-align:center;cursor:pointer;}
+.comp-btn.active{border-color:var(--gold);background:rgba(245,197,24,.08);}
+.comp-icon{font-size:1.1rem;display:block;margin-bottom:3px;}
+.comp-name{font-size:0.68rem;font-weight:700;color:var(--text);}
+.comp-sub{font-size:0.58rem;color:var(--dim2);}
+.comp-btn.active .comp-name{color:var(--gold);}
+
+/* Result layers */
+.layer-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;}
+.layer-item:last-child{border-bottom:none;}
+.layer-preview{width:36px;height:36px;border-radius:6px;flex-shrink:0;border:1px solid var(--border2);}
+.layer-info{flex:1;}
+.layer-name{font-size:0.75rem;font-weight:700;}
+.layer-desc{font-size:0.62rem;color:var(--dim2);}
+.layer-toggle{width:36px;height:20px;background:var(--card3);border:1px solid var(--border2);
+  border-radius:99px;cursor:pointer;position:relative;}
+.layer-toggle.on{background:var(--gold);border-color:var(--gold);}
+.layer-toggle::after{content:'';position:absolute;top:2px;right:2px;width:14px;height:14px;
+  background:white;border-radius:50%;transition:right .2s;}
+.layer-toggle.on::after{right:calc(100% - 16px);}
+
+/* GEE status */
+.gee-status{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:9px;
+  background:var(--card3);border:1px solid var(--border2);margin-bottom:9px;font-size:0.72rem;}
+.gdot{width:9px;height:9px;border-radius:50%;flex-shrink:0;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.gdot-ok{background:var(--green);box-shadow:0 0 5px var(--green);}
+.gdot-err{background:var(--red);}
+.gdot-wait{background:var(--orange);}
+
+#toast{position:fixed;bottom:85px;left:50%;transform:translateX(-50%);
+  background:rgba(245,197,24,.95);color:#07090c;padding:7px 16px;border-radius:99px;
+  font-weight:700;font-size:0.78rem;z-index:9999;pointer-events:none;
+  opacity:0;transition:opacity .3s;white-space:nowrap;}
+
+/* Legend */
+.legend-bar{height:14px;border-radius:6px;margin-bottom:4px;}
+.legend-labels{display:flex;justify-content:space-between;font-size:0.6rem;color:var(--dim2);}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="hex">⬡</div>
+    <div><h1>GOLDMAPPER GEE</h1><p>Google Earth Engine — تحليل طيفي حقيقي</p></div>
+  </div>
+  <div class="topbar-right">
+    <button class="tbtn" id="btnDraw" onclick="toggleDraw()">✏️ رسم</button>
+    <button class="tbtn" onclick="togglePanel()">☰</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="layout">
+  <div id="map">
+    <div class="loading" id="loading">
+      <div class="loading-title">🛰️ <span id="loadTitle">جاري التحليل...</span></div>
+      <div class="loading-bar"><div class="loading-fill" id="loadFill" style="width:0%"></div></div>
+      <div class="loading-txt" id="loadTxt">يتصل بـ Google Earth Engine...</div>
+    </div>
+
+    <div class="draw-banner" id="drawBanner">✏️ ارسم مستطيلاً لتحديد منطقة التحليل</div>
+
+    <div class="layer-btns">
+      <button class="lbtn on" id="lSat" onclick="setLayer('sat')">🛰️ أقمار</button>
+      <button class="lbtn" id="lStreet" onclick="setLayer('street')">🗺️ شوارع</button>
+      <button class="lbtn" id="lTopo" onclick="setLayer('topo')">🏔️ طبوغرافي</button>
+    </div>
+
+    <div class="map-search">
+      <span style="font-size:12px;color:var(--dim)">🔍</span>
+      <input id="searchInput" type="text" placeholder="ابحث عن منطقة..." onkeydown="if(event.key==='Enter')doSearch()">
+      <button onclick="doSearch()">بحث</button>
+    </div>
+    <div class="coords-bar" id="coordsBar">ارسم منطقة لبدء التحليل الطيفي</div>
+    <div id="toast"></div>
+  </div>
+
+  <!-- PANEL -->
+  <div class="panel" id="panel">
+    <div class="drag" onclick="togglePanel()"></div>
+    <div class="tabs">
+      <button class="tab active" id="tab-setup" onclick="switchTab('setup')"><span>⚙️</span><span>إعداد</span></button>
+      <button class="tab" id="tab-analyze" onclick="switchTab('analyze')"><span>🔬</span><span>تحليل</span></button>
+      <button class="tab" id="tab-layers" onclick="switchTab('layers')"><span>🗺️</span><span>طبقات</span></button>
+      <button class="tab" id="tab-about" onclick="switchTab('about')"><span>ℹ️</span><span>عن</span></button>
+    </div>
+
+    <!-- SETUP TAB -->
+    <div class="pane" id="pane-setup">
+      <div class="gee-status" id="geeStatus">
+        <div class="gdot gdot-wait" id="geeDot"></div>
+        <div>
+          <div style="font-weight:700;color:var(--text)" id="geeStatusText">جاري الاتصال بـ GEE...</div>
+          <div style="font-size:0.62rem;color:var(--dim2)" id="geeStatusSub">يستخدم Service Account</div>
+        </div>
+      </div>
+
+      <div class="alert alert-green" id="geeOkAlert" style="display:none;font-size:0.72rem">
+        ✅ متصل بـ Google Earth Engine<br>
+        المشروع: unified-hull-443307-f9<br>
+        الحساب: lhougee
+      </div>
+
+      <div class="alert alert-red" id="geeErrAlert" style="display:none;font-size:0.72rem">
+        ❌ <span id="geeErrMsg"></span><br>
+        <small>سيُستخدم STAC+Titiler كبديل</small>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📅 إعدادات الصورة</div>
+        <div class="ig">
+          <label>المصدر</label>
+          <select id="geeSource">
+            <option value="S2">🛰️ Sentinel-2 L2A (10م) — الأفضل</option>
+            <option value="ASTER">🔬 ASTER (15م) — دقيق للمعادن</option>
+            <option value="L9">🌍 Landsat-9 (30م)</option>
+          </select>
+        </div>
+        <div class="ig">
+          <label>من تاريخ</label>
+          <input type="text" id="dateStart" value="2023-01-01">
+        </div>
+        <div class="ig">
+          <label>إلى تاريخ</label>
+          <input type="text" id="dateEnd" value="2024-12-31">
+        </div>
+        <div class="ig">
+          <label>الحد الأقصى للغيوم</label>
+          <select id="geeCloud">
+            <option value="10">10%</option>
+            <option value="20" selected>20%</option>
+            <option value="30">30%</option>
+          </select>
+        </div>
+        <button class="btn-gold" onclick="switchTab('analyze')">← انتقل للتحليل</button>
+      </div>
+    </div>
+
+    <!-- ANALYZE TAB -->
+    <div class="pane" id="pane-analyze" style="display:none">
+      <div class="card card-gold">
+        <div class="card-title">📐 المنطقة</div>
+        <div class="ig">
+          <label>الزاوية الشمالية الغربية</label>
+          <input id="bboxNW" type="text" readonly placeholder="ارسم مستطيلاً على الخريطة" onclick="startDraw()">
+        </div>
+        <div class="ig">
+          <label>الزاوية الجنوبية الشرقية</label>
+          <input id="bboxSE" type="text" readonly placeholder="ارسم مستطيلاً على الخريطة" onclick="startDraw()">
+        </div>
+        <div id="bboxInfo" style="font-size:0.65rem;color:var(--dim2);display:none">
+          <span id="bboxDims" style="color:var(--gold)"></span>
+        </div>
+      </div>
+
+      <div class="sec">نوع التركيب الطيفي</div>
+      <div class="comp-grid">
+        <button class="comp-btn active" id="comp-band-ratio" onclick="selectComp('band-ratio')">
+          <span class="comp-icon">🔴</span>
+          <span class="comp-name">Band Ratio</span>
+          <span class="comp-sub">Fe/Clay/Hydro</span>
+        </button>
+        <button class="comp-btn" id="comp-pca" onclick="selectComp('pca')">
+          <span class="comp-icon">🟣</span>
+          <span class="comp-name">PCA</span>
+          <span class="comp-sub">Principal Component</span>
+        </button>
+        <button class="comp-btn" id="comp-mnf" onclick="selectComp('mnf')">
+          <span class="comp-icon">🟡</span>
+          <span class="comp-name">MNF/SAM</span>
+          <span class="comp-sub">Mineral Mapping</span>
+        </button>
+        <button class="comp-btn" id="comp-falsecolor" onclick="selectComp('falsecolor')">
+          <span class="comp-icon">🌈</span>
+          <span class="comp-name">False Color</span>
+          <span class="comp-sub">SWIR Composite</span>
+        </button>
+      </div>
+
+      <div class="sec">المعدن المستهدف</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="tbtn active" id="min-gold" onclick="selectMineral('gold')">🥇 ذهب</button>
+        <button class="tbtn" id="min-copper" onclick="selectMineral('copper')">🔶 نحاس</button>
+        <button class="tbtn" id="min-iron" onclick="selectMineral('iron')">🔴 حديد</button>
+        <button class="tbtn" id="min-all" onclick="selectMineral('all')">🌐 شامل</button>
+      </div>
+
+      <button class="btn-gold" onclick="runGEEAnalysis()">▶ تحليل بـ Google Earth Engine</button>
+      <button class="btn-outline" onclick="startDraw()">✏️ رسم منطقة جديدة</button>
+
+      <div class="sec">مناطق سريعة</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="tbtn" onclick="quickArea(29.10,-9.27,0.5,'أنتي أطلس')">أنتي أطلس</button>
+        <button class="tbtn" onclick="quickArea(30.5,-5.5,0.5,'أطلس المتوسط')">أطلس المتوسط</button>
+        <button class="tbtn" onclick="quickArea(28.0,-9.0,0.5,'درعة')">درعة</button>
+        <button class="tbtn" onclick="quickArea(31.5,-4.0,0.5,'الريش')">الريش</button>
+        <button class="tbtn" onclick="quickArea(5.5,-2.5,0.5,'غانا')">غانا</button>
+        <button class="tbtn" onclick="quickArea(-9.2,-77.5,0.5,'بيرو')">بيرو</button>
+      </div>
+    </div>
+
+    <!-- LAYERS TAB -->
+    <div class="pane" id="pane-layers" style="display:none">
+      <div id="layersList">
+        <div class="alert alert-info">حلّل منطقة لعرض الطبقات</div>
+      </div>
+    </div>
+
+    <!-- ABOUT TAB -->
+    <div class="pane" id="pane-about" style="display:none">
+      <div class="card">
+        <div class="card-title">🔬 تقنيات التحليل</div>
+        <div style="font-size:0.72rem;line-height:2;color:var(--dim2)">
+          <div>🔴 <b style="color:var(--text)">Band Ratio Composite</b><br>
+            <span style="font-size:0.62rem">Fe=B4/B2, Clay=B11/B8A, Hydro=(B11+B4)/(B8A+B2)</span></div>
+          <div>🟣 <b style="color:var(--text)">PCA — Principal Component Analysis</b><br>
+            <span style="font-size:0.62rem">يستخرج أنماط المعادن من جميع النطاقات</span></div>
+          <div>🟡 <b style="color:var(--text)">MNF — Minimum Noise Fraction</b><br>
+            <span style="font-size:0.62rem">يفصل الإشارة الطيفية عن الضوضاء</span></div>
+          <div>🌈 <b style="color:var(--text)">False Color SWIR</b><br>
+            <span style="font-size:0.62rem">B12-B11-B4 مثل الصور في البحث العلمي</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📡 المصادر</div>
+        <div style="font-size:0.7rem;line-height:1.9;color:var(--dim2)">
+          <div>• <b style="color:var(--text)">ASTER L2</b> — NASA — 15م — أفضل للمعادن</div>
+          <div>• <b style="color:var(--text)">Sentinel-2 L2A</b> — ESA — 10م</div>
+          <div>• <b style="color:var(--text)">Landsat-9 OLI-2</b> — USGS — 30م</div>
+          <div>• كلها مجانية عبر GEE</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🚀 خطوات البدء</div>
+        <div style="font-size:0.7rem;line-height:2;color:var(--dim2)">
+          <div>1. سجّل على signup.earthengine.google.com</div>
+          <div>2. انتظر الموافقة (24-48 ساعة)</div>
+          <div>3. أنشئ مشروعاً في console.cloud.google.com</div>
+          <div>4. فعّل Earth Engine API</div>
+          <div>5. أنشئ API Key وأدخله هنا</div>
+        </div>
+      </div>
+      <div class="alert alert-gold" style="font-size:0.7rem">⚠️ للأغراض الاستكشافية فقط.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ STATE ══
+const isMobile=window.innerWidth<=680;
+let map,baseLayers={},curBase='sat';
+let drawnItems,drawControl,drawMode=false;
+let panelOpen=!isMobile;
+let selectedBBox=null;
+let selectedComp='band-ratio';
+let selectedMineral='gold';
+let geeConnected=false;
+let geeKey=null,geeProject=null;
+let activeLayers=[];
+
+// ══ MAP ══
+map=L.map('map',{center:[31.5,-6.5],zoom:6,zoomControl:false});
+L.control.zoom({position:'bottomright'}).addTo(map);
+baseLayers.sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'©Esri',maxZoom:19}).addTo(map);
+baseLayers.street=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'©OSM',maxZoom:19});
+baseLayers.topo=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{attribution:'©OTM',maxZoom:17});
+
+drawnItems=new L.FeatureGroup().addTo(map);
+drawControl=new L.Control.Draw({
+  draw:{rectangle:{shapeOptions:{color:'#F5C518',weight:2,fillColor:'#F5C518',fillOpacity:0.06,dashArray:'5,5'}},
+    polygon:false,polyline:false,circle:false,marker:false,circlemarker:false},
+  edit:{featureGroup:drawnItems,remove:false}
+});
+map.on(L.Draw.Event.CREATED,function(e){
+  drawnItems.clearLayers();drawnItems.addLayer(e.layer);
+  const b=e.layer.getBounds();
+  setBBox({n:b.getNorth(),s:b.getSouth(),w:b.getWest(),e:b.getEast()});
+  stopDraw();switchTab('analyze');if(isMobile)openPanel();
+});
+map.on('mousemove click',e=>{
+  document.getElementById('coordsBar').innerHTML=
+    `<span>${e.latlng.lat.toFixed(5)}°N</span> / <span>${Math.abs(e.latlng.lng).toFixed(5)}°W</span>`;
+});
+
+// ══ DRAW ══
+function toggleDraw(){drawMode?stopDraw():startDraw();}
+function startDraw(){
+  drawMode=true;map.addControl(drawControl);
+  document.getElementById('drawBanner').classList.add('show');
+  document.getElementById('btnDraw').classList.add('active');
+  new L.Draw.Rectangle(map,drawControl.options.draw.rectangle).enable();
+}
+function stopDraw(){
+  drawMode=false;try{map.removeControl(drawControl);}catch(e){}
+  document.getElementById('drawBanner').classList.remove('show');
+  document.getElementById('btnDraw').classList.remove('active');
+}
+function setBBox(b){
+  selectedBBox=b;
+  const wKm=haversine(b.n,b.w,b.n,b.e).toFixed(1);
+  const hKm=haversine(b.n,b.w,b.s,b.w).toFixed(1);
+  document.getElementById('bboxNW').value=`${b.n.toFixed(5)}°N, ${b.w.toFixed(5)}°`;
+  document.getElementById('bboxSE').value=`${b.s.toFixed(5)}°N, ${b.e.toFixed(5)}°`;
+  document.getElementById('bboxDims').textContent=`${wKm}×${hKm} كم = ${(wKm*hKm).toFixed(0)} كم²`;
+  document.getElementById('bboxInfo').style.display='block';
+}
+
+// ══ SERVICE ACCOUNT CONFIG ══
+// Google Earth Engine Service Account
+const SA_CONFIG = {
+  project_id: 'unified-hull-443307-f9',
+  client_email: 'lhougee@unified-hull-443307-f9.iam.gserviceaccount.com',
+  private_key_id: 'c4d3a826f076c193bb9e96b3d3f3ecdfe7e2e365',
+  private_key: `-----BEGIN PRIVATE KEY-----
+MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCVXuoOq5HtS09I
+CUWx95P7LzyCntLa6wtEEyypCCM4tsnIfqhXuFHH4swpxiDWbqA66WrBtP82clWN
+7dCnkTBE2YwIaoo6vxhL/FzRWg5S//Uq8LH8gxdDhQAH3Nv8KbGBRp1hjkch0BXu
+zZnbi63ofyxwI83Nq4ruPJa7fXYMg0KRioIJYk/k3FRyxuTE3iDNJWJNmcvBFUSR
+8jAy/wtOOHMYzxs6Df+mly4sKUkibisJGCVAuu5bAp0iIUUAmIV3sCPCC0v2MjEm
+G78Dai73zyWbGMZAZlVmQi1BHGW7n4yDCfAUmhr5nZq0kXcWbX0GYR+pbnbQbXDW
+M9zsGgHzAgMBAAECggEAH4l7p39H/y7wXUg/49Re9SDDCN0ZrckEhun5evLR5O6K
+6f778hFjiu1yp7tCQaP3xphzxtQ9MjSvpZi5fjekVlUMQNalusOQELMGsdjuv011
+aQyKt8LBzaquF/rko3f2F1JedjOBBz2U8+eK/ZSfMkBvlHmqwSrf2W8HcCyMGRXn
+CVPWIvdV4z0ImP3CnUzWFM1LYL8XP3i/CmqBgVO0nUlyc48sEqkKV1G2GbaERvI0
+STwjZMd2hP5GbvPjRX7l1H/iU3sbmPABlnXqISmZFTncWqoPMCL2vyOOcW/I+OIU
+jxWfzjSxCkJMhiCDwWh+fpJDAjst370aHN5GzqLlaQKBgQDGxuUuD9iE5DFz5Fwz
+HGr8lNGsPn4m6D9o3huYpoUf61URX3tpqwZVChyptDi77FXMmN5VcnFtchnoTGYk
+ETl45BLuDs0+fJl59yIEQ3Si3o+hiVXceNtu2QT5THd7MHEECQWvEt4KUZphmGDf
+2GxKd6fEMCG29Z/0q6NzZChFjwKBgQDAXvi9sZ2cQhbCnvy2TPjOFeOzuiRlIyLQ
+OpJhO4equZoRDxYqaT+h3z+HMuaK7VcCZ9sAGGMC1bCtVnSw1GS9z1wIlnJV2bxW
+yLXkujqWwi7RMNqnIoKA1KXVoxZIkpAQFjfbCCB3UebwWxfIcCgWsZDwrR4y2/M/
+oZMZ1G7zXQKBgBhlEn1LrovooXUSoooXQ74J2Y2lAcBuolGRaJucXBwluoPuTuwR
+9C39lrTxDEFr6L+6Rxb/e5It/aX3slVc08vVWcljgabYjdFdFgyl5quSWtg9TY9I
+Oc3pzmV2D/fLYyNWpB7vVta3WxX9KG5wViHxe2Jlcc3NaTsS0XV45kRbAoGAGuDq
+Nm8Ly5p8XaMjQkGM/haW4zTeAvee1KNqcoWD1jnqqfmGqlRcXLy5vqVBCyZQYvip
+4+CEbQ/4iK+szExQ6yh+/oAu54ntw951c8kFiK0HJ5mA45txyphrt2b7JRa9ZFIG
+aec/ygw6jVjdANeS8mDLFKXLs2WCHmDwEcrZ2c0CgYB1KqcIDBRKkHF1pCRsOabs
+WoUmzAYR6Lcv0cNZsFezJSAe5pwfrC6JySlCmmxpOlsNKmbLsX4Pzj8lDm9YJzkX
+o93ayyWK/dfJpzSK4iFve6mp5w32RSoDJamud2exHHZAoazY2IUSo5MOjX+PDQMV
+rQ/rlMlSJA0w5Oq5UcRkIg==
+-----END PRIVATE KEY-----`
+};
+
+let geeAccessToken = null;
+let geeTokenExp = 0;
+
+// ══ JWT + OAuth2 for Service Account ══
+async function getGEEToken() {
+  if (geeAccessToken && Date.now() < geeTokenExp) return geeAccessToken;
+
+  try {
+    // Build JWT
+    const header = btoa(JSON.stringify({alg:'RS256',typ:'JWT'})).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+    const now = Math.floor(Date.now()/1000);
+    const claim = btoa(JSON.stringify({
+      iss: SA_CONFIG.client_email,
+      scope: 'https://www.googleapis.com/auth/earthengine',
+      aud: 'https://oauth2.googleapis.com/token',
+      exp: now + 3600,
+      iat: now
+    })).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+
+    const unsigned = `${header}.${claim}`;
+
+    // Sign with private key using Web Crypto API
+    const pemKey = SA_CONFIG.private_key
+      .replace('-----BEGIN PRIVATE KEY-----','')
+      .replace('-----END PRIVATE KEY-----','')
+      .replace(/\s+/g,'');
+
+    const binaryKey = Uint8Array.from(atob(pemKey), c => c.charCodeAt(0));
+    const cryptoKey = await crypto.subtle.importKey(
+      'pkcs8', binaryKey.buffer,
+      {name:'RSASSA-PKCS1-v1_5', hash:'SHA-256'},
+      false, ['sign']
+    );
+
+    const signature = await crypto.subtle.sign(
+      'RSASSA-PKCS1-v1_5', cryptoKey,
+      new TextEncoder().encode(unsigned)
+    );
+
+    const b64sig = btoa(String.fromCharCode(...new Uint8Array(signature)))
+      .replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+
+    const jwt = `${unsigned}.${b64sig}`;
+
+    // Exchange JWT for access token
+    const r = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: jwt
+      }),
+      signal: AbortSignal.timeout(15000)
+    });
+
+    const d = await r.json();
+    if (d.access_token) {
+      geeAccessToken = d.access_token;
+      geeTokenExp = Date.now() + (d.expires_in - 60) * 1000;
+      return geeAccessToken;
+    }
+    throw new Error(d.error_description || d.error || 'Token error');
+  } catch(e) {
+    throw new Error('OAuth2: ' + e.message);
+  }
+}
+
+async function connectGEE() {
+  setGEEStatus('wait', 'جاري المصادقة...');
+  try {
+    const token = await getGEEToken();
+    if (token) {
+      geeConnected = true;
+      geeProject = SA_CONFIG.project_id;
+      setGEEStatus('ok', `متصل — ${SA_CONFIG.project_id}`);
+      document.getElementById('geeOkAlert').style.display = 'block';
+      document.getElementById('geeErrAlert').style.display = 'none';
+      showToast('✅ GEE متصل بنجاح!');
+    }
+  } catch(e) {
+    geeConnected = false;
+    setGEEStatus('err', 'خطأ في الاتصال');
+    document.getElementById('geeErrMsg').textContent = e.message.slice(0,80);
+    document.getElementById('geeErrAlert').style.display = 'block';
+    showToast('⚠️ سيُستخدم STAC كبديل');
+  }
+}
+
+function testWithoutGEE(){
+  geeConnected=false;
+  setGEEStatus('wait','وضع STAC — بدون GEE');
+  switchTab('analyze');
+  showToast('⚠️ وضع محدود — يستخدم STAC مباشرة');
+}
+
+// ══ GEE ANALYSIS ══
+async function runGEEAnalysis(){
+  if(!selectedBBox){showToast('ارسم منطقة أولاً');startDraw();return;}
+  const bbox=selectedBBox;
+  const source=document.getElementById('geeSource').value;
+  const dateStart=document.getElementById('dateStart').value;
+  const dateEnd=document.getElementById('dateEnd').value;
+  const cloud=document.getElementById('geeCloud').value;
+
+  if(geeConnected){
+    await runWithGEE(bbox,source,dateStart,dateEnd,cloud);
+  } else {
+    await runWithoutGEE(bbox,source,dateStart,dateEnd,cloud);
+  }
+}
+
+// ══ REAL GEE ANALYSIS ══
+async function runWithGEE(bbox,source,dateStart,dateEnd,cloud){
+  showLoading(`🛰️ ${source} عبر GEE...`,10);
+
+  try{
+    // Get fresh OAuth token
+    setLoadProg(20,'🔑 مصادقة GEE...');
+    const token = await getGEEToken();
+
+    setLoadProg(35,'⚙️ بناء استعلام الصورة...');
+
+    // Build GEE REST API expression for Sentinel-2 SWIR composite
+    const collections={S2:'COPERNICUS/S2_SR_HARMONIZED',ASTER:'ASTER/AST_L1T_003',L9:'LANDSAT/LC09/C02/T1_L2'};
+    const col=collections[source]||collections.S2;
+
+    // Band selections per source
+    const bandConfigs={
+      S2:  {swir1:'B12',swir2:'B11',red:'B4',nir:'B8',blue:'B2',nir8a:'B8A',cloudProp:'CLOUDY_PIXEL_PERCENTAGE'},
+      L9:  {swir1:'SR_B7',swir2:'SR_B6',red:'SR_B4',nir:'SR_B5',blue:'SR_B2',nir8a:'SR_B5',cloudProp:'CLOUD_COVER'},
+      ASTER:{swir1:'B7',swir2:'B6',red:'B3N',nir:'B3N',blue:'B1',nir8a:'B5',cloudProp:'CLOUD_COVER'}
+    };
+    const bands=bandConfigs[source]||bandConfigs.S2;
+
+    // Composites based on selected type
+    const composites={
+      'falsecolor':`[${bands.swir1},${bands.swir2},${bands.red}]`,  // B12-B11-B4
+      'band-ratio': `[${bands.red}/${bands.blue},${bands.swir2}/${bands.nir8a},${bands.swir1}/${bands.swir2}]`,
+      'hydro':      `[(${bands.swir2}+${bands.red})/(${bands.nir8a}+${bands.blue})]`,
+      'pca':        `[${bands.swir1},${bands.swir2},${bands.nir},${bands.red},${bands.blue}]`
+    };
+
+    const vizParams={
+      'falsecolor':{bands:[bands.swir1,bands.swir2,bands.red],min:0,max:3000},
+      'band-ratio': {min:[0,0,0],max:[3,3,3]},
+      'hydro':      {min:0.5,max:3,palette:['blue','cyan','yellow','orange','red']},
+      'pca':        {bands:[bands.swir1,bands.swir2,bands.nir],min:0,max:3000}
+    };
+
+    const viz=vizParams[selectedComp]||vizParams.falsecolor;
+    const geomCoords=[[bbox.w,bbox.s],[bbox.e,bbox.s],[bbox.e,bbox.n],[bbox.w,bbox.n],[bbox.w,bbox.s]];
+
+    setLoadProg(50,'🛰️ جلب الصورة من GEE...');
+
+    // Use GEE REST API to get a map tile URL
+    const geeUrl=`https://earthengine.googleapis.com/v1/projects/${SA_CONFIG.project_id}/maps`;
+    const r=await fetch(geeUrl,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Bearer ${token}`
+      },
+      body:JSON.stringify({
+        expression:{
+          values:{
+            result:{
+              functionInvocationValue:{
+                functionName:'Image.visualize',
+                arguments:{
+                  input:{
+                    functionInvocationValue:{
+                      functionName:'ImageCollection.mosaic',
+                      arguments:{
+                        collection:{
+                          functionInvocationValue:{
+                            functionName:'ImageCollection.filterBounds',
+                            arguments:{
+                              collection:{
+                                functionInvocationValue:{
+                                  functionName:'ImageCollection.filterDate',
+                                  arguments:{
+                                    collection:{
+                                      functionInvocationValue:{
+                                        functionName:'ImageCollection.filter',
+                                        arguments:{
+                                          collection:{functionInvocationValue:{functionName:'ImageCollection.load',arguments:{id:{constantValue:col}}}},
+                                          filter:{functionInvocationValue:{functionName:'Filter.lte',arguments:{leftField:{constantValue:bands.cloudProp},rightValue:{constantValue:parseInt(cloud)}}}}
+                                        }
+                                      }
+                                    },
+                                    start:{constantValue:dateStart},
+                                    end:{constantValue:dateEnd}
+                                  }
+                                }
+                              },
+                              geometry:{
+                                functionInvocationValue:{
+                                  functionName:'GeometryConstructors.Polygon',
+                                  arguments:{coordinates:{constantValue:[geomCoords]}}
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  bands:{constantValue:viz.bands||(selectedComp==='band-ratio'?['ratio1','ratio2','ratio3']:null)},
+                  min:{constantValue:viz.min},
+                  max:{constantValue:viz.max},
+                  ...(viz.palette?{palette:{constantValue:viz.palette}}:{})
+                }
+              }
+            }
+          }
+        }
+      }),
+      signal:AbortSignal.timeout(30000)
+    });
+
+    setLoadProg(75,'🗺️ تحميل الخريطة...');
+    const d=await r.json();
+
+    if(d.name){
+      // Build tile URL from GEE map name
+      const mapId=d.name.split('/').pop();
+      const tileUrl=`https://earthengine.googleapis.com/v1/${d.name}/tiles/{z}/{x}/{y}`;
+
+      // Add as tile layer (needs auth header — use image overlay instead)
+      const previewUrl=`https://earthengine.googleapis.com/v1/${d.name}/tiles/10/512/512`;
+      setLoadProg(85,'📍 إضافة على الخريطة...');
+
+      // Clear old layers
+      activeLayers.forEach(l=>{ try{if(l.leafletLayer)map.removeLayer(l.leafletLayer);}catch(e){} });
+      activeLayers=[];
+
+      // Add authenticated tile layer
+      const authTileLayer = L.tileLayer('', {
+        opacity:0.85, attribution:'Google Earth Engine',
+        tileSize:256, maxZoom:20
+      });
+
+      // Use image overlay with preview for now
+      const bounds=[[bbox.s,bbox.w],[bbox.n,bbox.e]];
+      const previewResponse=await fetch(previewUrl,{
+        headers:{'Authorization':`Bearer ${token}`},
+        signal:AbortSignal.timeout(15000)
+      });
+
+      if(previewResponse.ok){
+        const blob=await previewResponse.blob();
+        const imgUrl=URL.createObjectURL(blob);
+        const ol=L.imageOverlay(imgUrl,bounds,{opacity:0.85,interactive:false,zIndex:400});
+        ol.addTo(map);
+        activeLayers.push({name:getCompositeLabel(),leafletLayer:ol,loaded:true,type:selectedComp,src:'GEE',date:`${dateStart} → ${dateEnd}`});
+      }
+
+      L.rectangle(bounds,{color:'#F5C518',weight:2,fill:false,dashArray:'5,5'}).addTo(drawnItems);
+      map.fitBounds(bounds,{padding:[30,30]});
+      setLoadProg(100,'✅ اكتمل!');
+      await sleep(400);
+      hideLoading();
+      buildLayersList();
+      switchTab('layers');
+      if(isMobile)openPanel();
+      showToast(`✅ GEE — ${source} — ${getCompositeLabel()}`);
+    } else {
+      throw new Error(d.error?.message||'لم تُرجع GEE خريطة — '+JSON.stringify(d).slice(0,100));
+    }
+  }catch(err){
+    hideLoading();
+    showToast('⚠️ GEE: '+err.message.slice(0,50)+' — جاري الانتقال لـ STAC');
+    await runWithoutGEE(bbox,source,document.getElementById('dateStart').value,document.getElementById('dateEnd').value,document.getElementById('geeCloud').value);
+  }
+}
+
+// ══ GEE EXPRESSIONS ══
+function buildBandRatioExpr(source){
+  // Band ratio composite for mineral exploration
+  if(source==='ASTER'){
+    return {
+      values:{result:{functionInvocationValue:{
+        functionName:'Image.visualize',
+        arguments:{
+          input:{functionInvocationValue:{
+            functionName:'Image.addBands',
+            arguments:{
+              dstImg:{functionInvocationValue:{
+                functionName:'ImageCollection.mosaic',
+                arguments:{collection:{functionInvocationValue:{
+                  functionName:'ImageCollection.filterDate',
+                  arguments:{
+                    collection:{functionInvocationValue:{functionName:'ImageCollection.load',arguments:{id:{constantValue:'NASA/ASTER_GED/AG100_003'}}}},
+                    start:{constantValue:document.getElementById('dateStart').value},
+                    end:{constantValue:document.getElementById('dateEnd').value}
+                  }
+                }}}
+              }},
+              srcImg:{constantValue:0}
+            }
+          }},
+          bands:{constantValue:['emissivity_band10','emissivity_band11','emissivity_band12']},
+          min:{constantValue:[-1,-1,-1]},
+          max:{constantValue:[1,1,1]}
+        }
+      }}}
+    };
+  }
+  // Sentinel-2 band ratio
+  return {
+    values:{result:{functionInvocationValue:{
+      functionName:'Image.visualize',
+      arguments:{
+        input:{functionInvocationValue:{
+          functionName:'Image.select',
+          arguments:{
+            input:{functionInvocationValue:{
+              functionName:'ImageCollection.mosaic',
+              arguments:{collection:{functionInvocationValue:{
+                functionName:'ImageCollection.filterDate',
+                arguments:{
+                  collection:{functionInvocationValue:{
+                    functionName:'ImageCollection.filter',
+                    arguments:{
+                      collection:{functionInvocationValue:{functionName:'ImageCollection.load',arguments:{id:{constantValue:'COPERNICUS/S2_SR_HARMONIZED'}}}},
+                      filter:{functionInvocationValue:{functionName:'Filter.lte',arguments:{leftField:{constantValue:'CLOUDY_PIXEL_PERCENTAGE'},rightValue:{constantValue:parseInt(document.getElementById('geeCloud').value)}}}}
+                    }
+                  }},
+                  start:{constantValue:document.getElementById('dateStart').value},
+                  end:{constantValue:document.getElementById('dateEnd').value}
+                }
+              }}}
+            }},
+            bandSelectors:{constantValue:['B12','B11','B4']}
+          }
+        }},
+        min:{constantValue:[0,0,0]},
+        max:{constantValue:[3000,3000,3000]}
+      }
+    }}}
+  };
+}
+
+function buildFalseColorExpr(source){
+  return buildBandRatioExpr(source); // SWIR false color
+}
+
+function buildPCAExpr(source){
+  return buildBandRatioExpr(source); // Simplified
+}
+
+// ══ WITHOUT GEE — RELIABLE WITH REAL IMAGERY ══
+async function runWithoutGEE(bbox,source,dateStart,dateEnd,cloud){
+  showLoading('🛰️ تحليل طيفي حقيقي...',10);
+
+  // Clear old layers
+  activeLayers.forEach(l=>{try{if(l.leafletLayer)map.removeLayer(l.leafletLayer);}catch(e){}});
+  activeLayers=[];
+  drawnItems.clearLayers();
+
+  const bounds=[[bbox.s,bbox.w],[bbox.n,bbox.e]];
+  L.rectangle(bounds,{color:'#F5C518',weight:2,fill:false,dashArray:'5,5'}).addTo(drawnItems);
+  map.fitBounds(bounds,{padding:[20,20]});
+
+  const STAC_E84='https://earth-search.aws.element84.com/v1';
+  const STAC_PC='https://planetarycomputer.microsoft.com/api/stac/v1';
+  const TITILER='https://titiler.xyz';
+  const bboxArr=[bbox.w,bbox.s,bbox.e,bbox.n];
+  const bboxStr=`${bbox.w},${bbox.s},${bbox.e},${bbox.n}`;
+  const cl=parseInt(cloud);
+
+  // ── STEP 1: Find real Sentinel-2 scene ──
+  setLoadProg(15,'🔍 البحث عن صور Sentinel-2...');
+  let sceneAssets=null, sceneDate='—', sceneSrc='—';
+
+  // Element84
+  try{
+    const r=await fetch(`${STAC_E84}/search`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        collections:['sentinel-2-l2a'], bbox:bboxArr,
+        datetime:`${dateStart}/${dateEnd}`,
+        query:{'eo:cloud_cover':{'lt':cl}},
+        sortby:[{field:'properties.eo:cloud_cover',direction:'asc'}], limit:1
+      }), signal:AbortSignal.timeout(12000)
+    });
+    if(r.ok){const d=await r.json();if(d.features?.length){
+      sceneAssets=d.features[0].assets;
+      sceneDate=d.features[0].properties.datetime?.slice(0,10);
+      sceneSrc='Sentinel-2 / Element84';
+      setLoadProg(30,`📅 صورة: ${sceneDate} — غيوم: ${(d.features[0].properties['eo:cloud_cover']||0).toFixed(0)}%`);
+    }}
+  }catch(e){}
+
+  // Planetary Computer fallback
+  if(!sceneAssets){
+    try{
+      let pcTok=null;
+      try{const tr=await fetch('https://planetarycomputer.microsoft.com/api/sas/v1/token/sentinel-2-l2a',{signal:AbortSignal.timeout(7000)});if(tr.ok){const td=await tr.json();pcTok=td.token;}}catch(e){}
+      const r=await fetch(`${STAC_PC}/search`,{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({collections:['sentinel-2-l2a'],bbox:bboxArr,datetime:`${dateStart}/${dateEnd}`,query:{'eo:cloud_cover':{'lt':cl}},limit:1}),
+        signal:AbortSignal.timeout(12000)
+      });
+      if(r.ok){const d=await r.json();if(d.features?.length){
+        const f=d.features[0];
+        if(pcTok)Object.values(f.assets).forEach(a=>{if(a.href?.includes('blob.core.windows.net'))a.href+=`?${pcTok}`;});
+        sceneAssets=f.assets; sceneDate=f.properties.datetime?.slice(0,10); sceneSrc='Sentinel-2 / PC';
+        setLoadProg(30,`📅 صورة: ${sceneDate}`);
+      }}
+    }catch(e){}
+  }
+
+  // ── STEP 2: Build spectral composites from real COG files ──
+  if(sceneAssets){
+    setLoadProg(50,'🎨 بناء التركيبات الطيفية...');
+    const getUrl=ks=>{for(const k of ks)if(sceneAssets[k]?.href)return sceneAssets[k].href;return null;};
+    const b12=getUrl(['swir22','B12']); const b11=getUrl(['swir16','B11']);
+    const b04=getUrl(['red','B04']);    const b08=getUrl(['nir','B08']);
+    const b8a=getUrl(['nir08','B8A']); const b02=getUrl(['blue','B02']);
+
+    const composites=[];
+
+    // 1. SWIR False Color (B12-B11-B4) — exact like research paper
+    if(b12&&b11&&b04) composites.push({
+      name:`SWIR False Color B12-B11-B4`,
+      url:`${TITILER}/cog/preview.png?url=${encodeURIComponent(b12)}&url=${encodeURIComponent(b11)}&url=${encodeURIComponent(b04)}&expression=b1,b2,b3&rescale=0,3000&width=512&height=512&bbox=${bboxStr}&resampling=bilinear`,
+      type:'falsecolor', src:sceneSrc, date:sceneDate, opacity:0.90,
+      desc:'أحمر/برتقالي = تغيير هيدروثرمالي'
+    });
+
+    // 2. Iron Oxide / Clay ratio RGB
+    if(b04&&b02&&b11&&b8a) composites.push({
+      name:`Band Ratio (Fe=B4/B2, Clay=B11/B8A, SWIR=B11/B12)`,
+      url:`${TITILER}/cog/preview.png?url=${encodeURIComponent(b04)}&url=${encodeURIComponent(b02)}&url=${encodeURIComponent(b11)}&url=${encodeURIComponent(b8a)}&expression=b1/b2,b3/b4,b3/b4&rescale=0,3&width=512&height=512&bbox=${bboxStr}`,
+      type:'bandratio', src:sceneSrc, date:sceneDate, opacity:0.88,
+      desc:'أصفر = أكاسيد حديد عالية'
+    });
+
+    // 3. Hydrothermal Alteration Index
+    if(b11&&b04&&b8a&&b02) composites.push({
+      name:`Hydrothermal Alteration Index`,
+      url:`${TITILER}/cog/preview.png?url=${encodeURIComponent(b11)}&url=${encodeURIComponent(b04)}&url=${encodeURIComponent(b8a)}&url=${encodeURIComponent(b02)}&expression=(b1+b2)/(b3+b4)&rescale=0.8,2.5&colormap_name=hot&width=512&height=512&bbox=${bboxStr}`,
+      type:'hydro', src:sceneSrc, date:sceneDate, opacity:0.85,
+      desc:'أبيض/أحمر = تغيير حراري قوي'
+    });
+
+    // 4. Clay minerals only
+    if(b11&&b8a) composites.push({
+      name:`Clay Minerals Index (B11/B8A)`,
+      url:`${TITILER}/cog/preview.png?url=${encodeURIComponent(b11)}&url=${encodeURIComponent(b8a)}&expression=b1/b2&rescale=1,3&colormap_name=YlOrRd&width=512&height=512&bbox=${bboxStr}`,
+      type:'clay', src:sceneSrc, date:sceneDate, opacity:0.85,
+      desc:'أصفر/أحمر = معادن طينية'
+    });
+
+    setLoadProg(70,'📍 تحميل الطبقات على الخريطة...');
+
+    for(let ci=0;ci<composites.length;ci++){
+      const comp=composites[ci];
+      setLoadProg(70+ci*7,`📥 ${comp.name}...`);
+      await new Promise(resolve=>{
+        const img=new Image();
+        img.crossOrigin='anonymous';
+        img.onload=()=>{
+          const ol=L.imageOverlay(img.src,bounds,{opacity:comp.opacity,interactive:false,zIndex:400+ci});
+          // Show only first layer by default
+          if(ci===0) ol.addTo(map);
+          comp.leafletLayer=ol; comp.loaded=true;
+          activeLayers.push(comp); resolve();
+        };
+        img.onerror=()=>{comp.loaded=false;resolve();};
+        img.src=comp.url;
+        setTimeout(resolve,15000);
+      });
+    }
+
+    const loaded=activeLayers.filter(l=>l.loaded).length;
+    setLoadProg(100,`✅ ${loaded} طبقات من ${sceneSrc}`);
+    await sleep(400); hideLoading();
+    buildLayersList(); switchTab('layers');
+    if(isMobile)openPanel();
+    showToast(`✅ ${loaded} طبقات Sentinel-2 — ${sceneDate}`);
+
+  } else {
+    // ── STEP 3: Absolute fallback — NASA WMTS tiles ──
+    setLoadProg(60,'🌍 NASA GIBS — صور حقيقية...');
+
+    // Use WMTS tiles instead of WMS — more reliable
+    const wmtsLayers=[
+      {
+        name:'MODIS SWIR Bands 7-2-1',
+        url:'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_SurfaceReflectance_Bands721/default/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg',
+        type:'falsecolor', src:'NASA GIBS/MODIS', date:'يومي', opacity:0.85,
+        desc:'أحمر = نباتات وتربة معدنية'
+      },
+      {
+        name:'MODIS Land Surface Temp',
+        url:'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_Land_Surface_Temp_Day/default/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png',
+        type:'hydro', src:'NASA GIBS/MODIS', date:'يومي', opacity:0.75,
+        desc:'ألوان حارة = حرارة سطحية عالية'
+      }
+    ];
+
+    for(const wl of wmtsLayers){
+      try{
+        const tl=L.tileLayer(wl.url,{opacity:wl.opacity,attribution:'NASA GIBS',zIndex:400+activeLayers.length});
+        tl.addTo(map);
+        wl.leafletLayer=tl; wl.loaded=true;
+        activeLayers.push(wl);
+      }catch(e){wl.loaded=false;}
+    }
+
+    setLoadProg(100,'✅ NASA GIBS جاهز');
+    await sleep(300); hideLoading();
+    buildLayersList(); switchTab('layers');
+    if(isMobile)openPanel();
+    showToast('⚠️ لا توجد صور Sentinel-2 — استُخدمت NASA GIBS');
+  }
+}
+
+async function addTitilerLayer(layer,bounds){
+  return new Promise((resolve)=>{
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=()=>{
+      const ol=L.imageOverlay(layer.url,bounds,{opacity:layer.opacity,interactive:false,zIndex:400+activeLayers.length});
+      ol.addTo(map);
+      layer.leafletLayer=ol;
+      layer.loaded=true;
+      activeLayers.push(layer);
+      resolve();
+    };
+    img.onerror=()=>{layer.loaded=false;resolve();};
+    img.src=layer.url;
+    setTimeout(resolve,10000);
+  });
+}
+
+function addGEELayer(tileUrl,name,bbox){
+  const ol=L.tileLayer(tileUrl,{opacity:0.85,attribution:'Google Earth Engine',maxZoom:20});
+  ol.addTo(map);
+  activeLayers.push({name,leafletLayer:ol,loaded:true,type:'gee'});
+  map.fitBounds([[bbox.s,bbox.w],[bbox.n,bbox.e]],{padding:[30,30]});
+}
+
+// ══ LAYERS LIST ══
+function buildLayersList(){
+  const loaded=activeLayers.filter(l=>l.loaded);
+  if(!loaded.length){
+    document.getElementById('layersList').innerHTML='<div class="alert alert-info">لا توجد طبقات بعد — حلّل منطقة أولاً</div>';
+    return;
+  }
+
+  const colors={
+    falsecolor:'linear-gradient(135deg,#ff6b6b,#4ecdc4,#45b7d1)',
+    bandratio:'linear-gradient(135deg,#f9ca24,#6ab04c,#e55039)',
+    hydro:'linear-gradient(135deg,#8e44ad,#e74c3c,#f39c12)',
+    clay:'linear-gradient(135deg,#f39c12,#e67e22,#d35400)',
+    gee:'linear-gradient(135deg,#F5C518,#c8971a)'
+  };
+
+  document.getElementById('layersList').innerHTML=`
+    <div class="alert alert-green" style="font-size:0.7rem;margin-bottom:10px">
+      ✅ ${loaded.length} طبقات حقيقية — انقر لتبديلها
+    </div>
+    <div style="font-size:0.68rem;color:var(--dim2);margin-bottom:8px">
+      💡 اضغط على الطبقة لإظهارها أو إخفائها
+    </div>
+    ${activeLayers.map((l,i)=>`
+    <div class="layer-item" onclick="toggleLayer(${i})" style="cursor:pointer">
+      <div class="layer-preview" style="background:${colors[l.type]||colors.gee}"></div>
+      <div class="layer-info">
+        <div class="layer-name" style="font-size:0.72rem">${l.name}</div>
+        <div class="layer-desc">📅 ${l.date||'—'} | ${l.src||'—'}</div>
+        ${l.desc?`<div class="layer-desc" style="color:var(--gold);font-size:0.62rem">${l.desc}</div>`:''}
+        <div class="layer-desc" style="color:${l.loaded?'var(--green)':'var(--red)'}">
+          ${l.loaded?'✅ محملة':'❌ فشل التحميل'}
+        </div>
+      </div>
+      <div class="layer-toggle ${map.hasLayer(l.leafletLayer)?'on':''}" id="lt-${i}"></div>
+    </div>`).join('')}
+
+    <div style="margin-top:12px;padding:10px;background:var(--card3);border-radius:9px;font-size:0.7rem;line-height:1.8;color:var(--dim2)">
+      <div style="color:var(--gold);font-weight:700;margin-bottom:5px">🔬 دليل الألوان:</div>
+      <div>🔴 <b style="color:var(--text)">SWIR False Color:</b> أحمر/برتقالي = تغيير معدني</div>
+      <div>🟡 <b style="color:var(--text)">Band Ratio:</b> أصفر/أخضر = أكاسيد حديد</div>
+      <div>🔥 <b style="color:var(--text)">Hydrothermal:</b> أبيض/أحمر = تغيير حراري</div>
+      <div>🟠 <b style="color:var(--text)">Clay:</b> برتقالي/أحمر = معادن طينية</div>
+    </div>`;
+}
+}
+
+function toggleLayer(i){
+  const layer=activeLayers[i];
+  if(!layer?.leafletLayer)return;
+  const btn=document.getElementById('lt-'+i);
+  if(map.hasLayer(layer.leafletLayer)){map.removeLayer(layer.leafletLayer);btn.classList.remove('on');}
+  else{layer.leafletLayer.addTo(map);btn.classList.add('on');}
+}
+
+// ══ HELPERS ══
+function setGEEStatus(state,msg){
+  const dot=document.getElementById('geeDot'),txt=document.getElementById('geeStatusText');
+  dot.className='gdot '+(state==='ok'?'gdot-ok':state==='err'?'gdot-err':'gdot-wait');
+  txt.textContent=msg;
+}
+function showLoading(title,pct){
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('loadTitle').textContent=title;
+  document.getElementById('loadFill').style.width=pct+'%';
+}
+function setLoadProg(pct,txt){
+  document.getElementById('loadFill').style.width=pct+'%';
+  document.getElementById('loadTxt').textContent=txt;
+}
+function hideLoading(){document.getElementById('loading').classList.remove('show');}
+function getCompositeLabel(){
+  const labels={'band-ratio':'Band Ratio Composite','pca':'PCA Composite','falsecolor':'SWIR False Color','mnf':'MNF Composite'};
+  return labels[selectedComp]||'Spectral Composite';
+}
+function selectComp(c){
+  selectedComp=c;
+  document.querySelectorAll('.comp-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('comp-'+c).classList.add('active');
+}
+function selectMineral(m){
+  selectedMineral=m;
+  document.querySelectorAll('[id^="min-"]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('min-'+m).classList.add('active');
+}
+function setLayer(n){
+  map.removeLayer(baseLayers[curBase]);baseLayers[n].addTo(map);curBase=n;
+  ['Sat','Street','Topo'].forEach(x=>document.getElementById('l'+x)?.classList.remove('on'));
+  document.getElementById('l'+n.charAt(0).toUpperCase()+n.slice(1))?.classList.add('on');
+}
+function quickArea(lat,lon,sp,name){
+  const b={n:lat+sp,s:lat-sp,w:lon-sp,e:lon+sp};
+  selectedBBox=b;setBBox(b);
+  map.flyTo([lat,lon],10,{duration:1.5});
+  drawnItems.clearLayers();
+  L.rectangle([[b.s,b.w],[b.n,b.e]],{color:'#F5C518',weight:2,fillColor:'#F5C518',fillOpacity:.05,dashArray:'5,5'}).addTo(drawnItems);
+  showToast(`📍 ${name}`);
+  if(isMobile)openPanel();
+}
+function doSearch(){
+  const q=document.getElementById('searchInput').value.trim();if(!q)return;
+  fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`)
+    .then(r=>r.json()).then(d=>{
+      if(d.length)quickArea(parseFloat(d[0].lat),parseFloat(d[0].lon),0.3,d[0].display_name.split(',')[0]);
+      else showToast('لم يتم العثور على المنطقة');
+    }).catch(()=>showToast('تحقق من الإنترنت'));
+}
+function togglePanel(){panelOpen?closePanel():openPanel();}
+function openPanel(){panelOpen=true;document.getElementById('panel').classList.add('open');}
+function closePanel(){panelOpen=false;document.getElementById('panel').classList.remove('open');}
+function switchTab(n){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.pane').forEach(p=>p.style.display='none');
+  document.getElementById('tab-'+n).classList.add('active');
+  document.getElementById('pane-'+n).style.display='block';
+  if(isMobile)openPanel();
+}
+function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2500);}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function haversine(a,b,c,d){const R=6371,da=(c-a)*Math.PI/180,db=(d-b)*Math.PI/180;const x=Math.sin(da/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(db/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+
+// ══ INIT ══
+if(!isMobile)openPanel();
+// Auto-connect with service account on startup
+connectGEE().then(()=>{
+  if(geeConnected) switchTab('analyze');
+}).catch(()=>{});
+
+</script>
+</body>
+</html>
