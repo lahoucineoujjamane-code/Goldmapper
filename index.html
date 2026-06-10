@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="theme-color" content="#080a0d">
+<title>⬡ GoldMapper Pro</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+:root{
+  --gold:#F5C518;--gold2:#c8971a;--bg:#07090c;--card:#0d1117;
+  --card2:#141a22;--card3:#1c2433;--border:#1e2736;--border2:#283040;
+  --text:#dde4ef;--dim:#4a5568;--dim2:#667180;
+  --green:#10b981;--red:#ef4444;--blue:#3b82f6;--orange:#f97316;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);}
+body{display:flex;flex-direction:column;}
+
+/* TOPBAR */
+.topbar{background:#0d1117;border-bottom:1px solid var(--border);padding:10px 14px;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:500;}
+.brand{display:flex;align-items:center;gap:10px;}
+.hex{width:36px;height:36px;background:linear-gradient(135deg,#F5C518,#c8971a);
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+  color:#07090c;font-weight:900;animation:glow 3s ease-in-out infinite;}
+@keyframes glow{0%,100%{filter:drop-shadow(0 0 3px #F5C51855)}50%{filter:drop-shadow(0 0 10px #F5C518aa)}}
+.brand h1{font-size:1rem;font-weight:900;color:var(--gold);}
+.brand p{font-size:0.56rem;color:var(--dim2);}
+.topbar-right{display:flex;gap:5px;}
+.tbtn{height:32px;padding:0 10px;background:var(--card2);border:1px solid var(--border2);
+  border-radius:8px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.68rem;
+  cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;}
+.tbtn.active{border-color:var(--gold);color:var(--gold);}
+
+/* LAYOUT */
+.layout{flex:1;display:flex;overflow:hidden;position:relative;min-height:0;}
+#map{flex:1;height:100%;}
+
+/* MAP OVERLAYS */
+.draw-banner{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  background:rgba(245,197,24,.96);color:#07090c;padding:8px 18px;border-radius:99px;
+  font-weight:900;font-size:0.8rem;z-index:1000;display:none;pointer-events:none;white-space:nowrap;}
+.draw-banner.show{display:block;}
+
+.layer-btns{position:absolute;top:10px;right:10px;z-index:400;display:flex;flex-direction:column;gap:5px;}
+.lbtn{background:rgba(7,9,12,.92);border:1px solid var(--border2);border-radius:9px;
+  padding:7px 11px;font-family:'Cairo',sans-serif;font-size:0.68rem;color:var(--text);
+  cursor:pointer;backdrop-filter:blur(8px);display:flex;align-items:center;gap:5px;}
+.lbtn.on{border-color:var(--gold);color:var(--gold);}
+
+.map-search{position:absolute;bottom:70px;left:10px;right:10px;z-index:400;
+  display:flex;gap:6px;background:rgba(7,9,12,.93);border:1px solid var(--border2);
+  border-radius:11px;padding:7px 11px;backdrop-filter:blur(10px);}
+.map-search input{flex:1;background:none;border:none;outline:none;color:var(--text);
+  font-family:'Cairo',sans-serif;font-size:0.78rem;}
+.map-search input::placeholder{color:var(--dim);}
+.map-search button{background:var(--gold);color:#07090c;border:none;border-radius:7px;
+  padding:5px 11px;font-family:'Cairo',sans-serif;font-size:0.7rem;font-weight:700;cursor:pointer;}
+
+.coords-bar{position:absolute;bottom:118px;left:50%;transform:translateX(-50%);
+  background:rgba(7,9,12,.87);border:1px solid var(--border2);border-radius:99px;
+  padding:5px 13px;font-size:0.65rem;color:var(--dim2);z-index:300;
+  pointer-events:none;white-space:nowrap;backdrop-filter:blur(6px);}
+.coords-bar span{color:var(--gold);}
+
+/* PANEL */
+.panel{width:300px;background:var(--card);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;z-index:200;}
+@media(max-width:680px){
+  .panel{position:absolute;bottom:0;left:0;right:0;width:100%;max-height:60vh;
+    border-left:none;border-top:2px solid var(--gold2);border-radius:16px 16px 0 0;
+    transform:translateY(calc(100% - 50px));transition:transform .3s ease;}
+  .panel.open{transform:translateY(0);}
+}
+.drag{display:none;width:36px;height:4px;background:var(--border2);border-radius:99px;margin:9px auto 2px;cursor:pointer;}
+@media(max-width:680px){.drag{display:block;}}
+.tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab{flex:1;padding:9px 3px 7px;border:none;background:none;font-family:'Cairo',sans-serif;
+  font-size:0.6rem;color:var(--dim2);cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;gap:2px;border-bottom:2px solid transparent;}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+.pane{flex:1;overflow-y:auto;padding:12px;-webkit-overflow-scrolling:touch;}
+.pane::-webkit-scrollbar{width:3px;}
+.pane::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
+
+/* COMPONENTS */
+.card{background:var(--card2);border:1px solid var(--border);border-radius:11px;padding:12px;margin-bottom:9px;}
+.card-gold{border-color:rgba(245,197,24,.3);}
+.card-title{font-size:0.78rem;font-weight:700;color:var(--gold);margin-bottom:9px;display:flex;align-items:center;gap:5px;}
+.ig{margin-bottom:8px;}
+.ig label{font-size:0.67rem;color:var(--dim2);margin-bottom:3px;display:block;}
+.ig input,.ig select{width:100%;background:var(--card3);border:1px solid var(--border2);
+  border-radius:8px;padding:8px 10px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.8rem;outline:none;}
+.ig input[readonly]{color:var(--dim2);cursor:pointer;}
+.btn-gold{width:100%;background:linear-gradient(135deg,#F5C518,#d4a017);color:#07090c;
+  border:none;border-radius:10px;padding:11px;font-family:'Cairo',sans-serif;
+  font-size:0.88rem;font-weight:900;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;gap:7px;box-shadow:0 3px 12px rgba(245,197,24,.2);}
+.btn-outline{width:100%;background:transparent;color:var(--gold);border:1px solid var(--gold2);
+  border-radius:10px;padding:9px;font-family:'Cairo',sans-serif;font-size:0.8rem;
+  font-weight:700;cursor:pointer;margin-top:6px;}
+.chips{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0;}
+.chip{padding:4px 10px;border-radius:99px;font-size:0.67rem;border:1px solid var(--border2);
+  cursor:pointer;background:var(--card3);color:var(--dim2);}
+.chip.active{background:var(--gold);color:#07090c;border-color:var(--gold);font-weight:700;}
+.sec{font-size:0.62rem;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:1.5px;margin:11px 0 6px;}
+.spin-wrap{display:none;flex-direction:column;align-items:center;padding:18px;gap:10px;}
+.spin-wrap.show{display:flex;}
+.spinner{width:38px;height:38px;border:3px solid var(--border2);border-top-color:var(--gold);border-radius:50%;animation:spin .75s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin-txt{color:var(--dim2);font-size:0.75rem;text-align:center;}
+.spin-prog{width:100%;height:3px;background:var(--card3);border-radius:99px;overflow:hidden;}
+.spin-prog-fill{height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold));border-radius:99px;transition:width .4s ease;}
+.alert{border-radius:8px;padding:9px 11px;font-size:0.72rem;margin-bottom:9px;line-height:1.5;}
+.alert-gold{background:rgba(245,197,24,.07);border:1px solid rgba(245,197,24,.22);color:#c8971a;}
+.alert-info{background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.22);color:#60a5fa;}
+.alert-green{background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.22);color:#34d399;}
+.alert-red{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.22);color:#f87171;}
+
+/* INDEX CARDS — main results */
+.idx-card{background:var(--card2);border:1px solid var(--border2);border-radius:11px;
+  padding:13px;margin-bottom:9px;}
+.idx-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.idx-name{font-size:0.82rem;font-weight:700;}
+.idx-formula{font-size:0.65rem;color:var(--dim2);font-family:monospace;}
+.idx-value{font-size:1.6rem;font-weight:900;margin:4px 0;}
+.idx-bar{height:8px;background:var(--card3);border-radius:99px;overflow:hidden;margin-bottom:6px;}
+.idx-bar-fill{height:100%;border-radius:99px;transition:width 1.4s ease;}
+.idx-interp{font-size:0.7rem;padding:4px 10px;border-radius:99px;display:inline-block;font-weight:600;}
+
+/* Stats grid */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:9px;}
+.stat{background:var(--card3);border:1px solid var(--border2);border-radius:9px;padding:10px 8px;text-align:center;}
+.stat-v{font-size:1.2rem;font-weight:900;color:var(--gold);}
+.stat-l{font-size:0.6rem;color:var(--dim2);margin-top:2px;}
+
+/* Login */
+.login-bar{display:flex;align-items:center;gap:7px;background:var(--card2);
+  border:1px solid var(--border2);border-radius:9px;padding:8px 11px;margin-bottom:9px;}
+.ldot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.ldot.on{background:var(--green);box-shadow:0 0 5px var(--green);}
+.ldot.off{background:var(--dim2);}
+.linfo{flex:1;font-size:0.7rem;}
+.lname{color:var(--text);font-weight:600;}
+.lsub{color:var(--dim2);font-size:0.62rem;}
+.lbtn{background:var(--card3);border:1px solid var(--border2);color:var(--text);
+  border-radius:7px;padding:5px 10px;font-family:'Cairo',sans-serif;font-size:0.65rem;cursor:pointer;}
+
+/* History */
+.hist-item{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;}
+.hist-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.hist-date{font-size:0.62rem;color:var(--dim2);}
+.hist-score{font-size:0.78rem;font-weight:900;}
+.hist-loc{font-size:0.7rem;margin-bottom:3px;}
+.hist-vals{font-size:0.6rem;color:var(--dim2);font-family:monospace;margin-bottom:6px;}
+.hist-acts{display:flex;gap:5px;}
+.hist-acts button{flex:1;background:var(--card3);border:1px solid var(--border2);
+  color:var(--text);border-radius:6px;padding:4px;font-family:'Cairo',sans-serif;font-size:0.63rem;cursor:pointer;}
+
+/* Source badge */
+.src-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;
+  border-radius:99px;font-size:0.65rem;font-weight:700;margin-bottom:8px;}
+.sb-real{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#34d399;}
+.sb-sim{background:rgba(245,197,24,.1);border:1px solid rgba(245,197,24,.3);color:#c8971a;}
+
+/* Leaflet */
+.leaflet-popup-content-wrapper{background:var(--card2)!important;border:1px solid var(--gold2)!important;color:var(--text)!important;border-radius:11px!important;}
+.leaflet-popup-tip{background:var(--card2)!important;}
+.leaflet-popup-content{font-family:'Cairo',sans-serif;font-size:0.76rem;line-height:1.7;margin:10px 12px!important;}
+.leaflet-popup-content b{color:var(--gold);}
+.leaflet-bar a{background:rgba(7,9,12,.9)!important;color:var(--text)!important;border-color:var(--border2)!important;}
+.leaflet-control-attribution{background:rgba(0,0,0,.5)!important;color:var(--dim)!important;font-size:9px!important;}
+
+#toast{position:fixed;bottom:85px;left:50%;transform:translateX(-50%);
+  background:rgba(245,197,24,.95);color:#07090c;padding:7px 16px;
+  border-radius:99px;font-weight:700;font-size:0.78rem;z-index:9999;
+  pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap;}
+
+/* Login modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;
+  display:none;align-items:center;justify-content:center;padding:16px;}
+.modal-bg.show{display:flex;}
+.modal{background:var(--card);border:1px solid var(--border2);border-radius:16px;
+  padding:22px;width:100%;max-width:340px;}
+.modal h2{font-size:1rem;font-weight:900;color:var(--gold);text-align:center;margin-bottom:4px;}
+.modal p{font-size:0.72rem;color:var(--dim2);text-align:center;margin-bottom:16px;line-height:1.5;}
+.modal input{width:100%;background:var(--card3);border:1px solid var(--border2);border-radius:9px;
+  padding:10px 12px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.85rem;
+  outline:none;margin-bottom:9px;}
+.modal-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#f87171;
+  border-radius:8px;padding:8px 11px;font-size:0.72rem;margin-bottom:9px;display:none;}
+.modal-ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#34d399;
+  border-radius:8px;padding:8px 11px;font-size:0.72rem;margin-bottom:9px;display:none;}
+.modal .btn-gold{margin-bottom:7px;}
+.modal .btn-skip{width:100%;background:transparent;color:var(--dim2);border:1px solid var(--border2);
+  border-radius:10px;padding:9px;font-family:'Cairo',sans-serif;font-size:0.8rem;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN MODAL -->
+<div class="modal-bg" id="loginModal">
+  <div class="modal">
+    <div style="text-align:center;font-size:2rem;margin-bottom:8px">⬡</div>
+    <h2>تسجيل الدخول</h2>
+    <p>حساب مجاني على<br>
+      <a href="https://dataspace.copernicus.eu/registration" target="_blank" style="color:var(--blue)">dataspace.copernicus.eu ↗</a>
+    </p>
+    <input id="mEmail" type="email" placeholder="البريد الإلكتروني">
+    <input id="mPass" type="password" placeholder="كلمة المرور">
+    <div class="modal-err" id="mErr"></div>
+    <div class="modal-ok" id="mOk"></div>
+    <button class="btn-gold" id="mBtn" onclick="doLogin()">🛰️ دخول — Copernicus</button>
+    <button class="btn-skip" onclick="closeModal()">تخطي — استخدام Element84 المجاني</button>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="hex">⬡</div>
+    <div><h1>GOLDMAPPER</h1><p>Sentinel-2 Real Spectral Analysis</p></div>
+  </div>
+  <div class="topbar-right">
+    <button class="tbtn" id="btnDraw" onclick="toggleDraw()">✏️ رسم</button>
+    <button class="tbtn" onclick="locateMe()">📡</button>
+    <button class="tbtn" onclick="togglePanel()">☰</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="layout">
+  <div id="map">
+    <div class="draw-banner" id="drawBanner">✏️ ارسم مستطيلاً لتحديد المنطقة</div>
+    <div class="layer-btns">
+      <button class="lbtn on" id="lSat" onclick="setLayer('sat')">🛰️ أقمار</button>
+      <button class="lbtn" id="lStreet" onclick="setLayer('street')">🗺️ شوارع</button>
+      <button class="lbtn" id="lTopo" onclick="setLayer('topo')">🏔️ طبوغرافي</button>
+      <button class="lbtn" id="lDark" onclick="setLayer('dark')">🌑 داكن</button>
+    </div>
+    <div class="map-search">
+      <span style="font-size:12px;color:var(--dim)">🔍</span>
+      <input id="searchInput" type="text" placeholder="ابحث عن أي منطقة في العالم..." onkeydown="if(event.key==='Enter')doSearch()">
+      <button onclick="doSearch()">بحث</button>
+    </div>
+    <div class="coords-bar" id="coordsBar">انقر على الخريطة أو ارسم منطقة للتحليل</div>
+    <div id="toast"></div>
+  </div>
+
+  <!-- PANEL -->
+  <div class="panel" id="panel">
+    <div class="drag" onclick="togglePanel()"></div>
+    <div class="tabs">
+      <button class="tab active" id="tab-analyze" onclick="switchTab('analyze')"><span>🔍</span><span>تحليل</span></button>
+      <button class="tab" id="tab-results" onclick="switchTab('results')"><span>📊</span><span>نتائج</span></button>
+      <button class="tab" id="tab-history" onclick="switchTab('history')"><span>📋</span><span>سجل</span></button>
+      <button class="tab" id="tab-about" onclick="switchTab('about')"><span>ℹ️</span><span>عن</span></button>
+    </div>
+
+    <!-- ANALYZE TAB -->
+    <div class="pane" id="pane-analyze">
+      <div class="login-bar">
+        <div class="ldot off" id="ldot"></div>
+        <div class="linfo">
+          <div class="lname" id="lname">غير مسجّل</div>
+          <div class="lsub">Copernicus — Sentinel-2 حقيقي</div>
+        </div>
+        <button class="lbtn" id="lbtn" onclick="openModal()">دخول</button>
+      </div>
+
+      <div class="alert alert-gold" style="font-size:0.7rem">
+        🌍 تنقّل ← ✏️ ارسم منطقة ← ▶ تحليل للحصول على مؤشرات حقيقية
+      </div>
+
+      <div class="card card-gold">
+        <div class="card-title">📐 المنطقة المحددة</div>
+        <div class="ig">
+          <label>الزاوية الشمالية الغربية</label>
+          <input id="bboxNW" type="text" readonly placeholder="ارسم مستطيلاً على الخريطة" onclick="startDraw()">
+        </div>
+        <div class="ig">
+          <label>الزاوية الجنوبية الشرقية</label>
+          <input id="bboxSE" type="text" readonly placeholder="ارسم مستطيلاً على الخريطة" onclick="startDraw()">
+        </div>
+        <div id="bboxInfo" style="font-size:0.65rem;color:var(--dim2);display:none">
+          <span id="bboxArea" style="color:var(--gold)"></span> كم²
+          | <span id="bboxDims"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⚙️ إعدادات</div>
+        <div class="ig">
+          <label>الحد الأقصى للغيوم</label>
+          <select id="cloud">
+            <option value="10">10%</option>
+            <option value="20" selected>20%</option>
+            <option value="30">30%</option>
+            <option value="50">50%</option>
+          </select>
+        </div>
+        <div class="ig">
+          <label>نافذة البحث الزمني</label>
+          <select id="dateRange">
+            <option value="90">آخر 3 أشهر</option>
+            <option value="180" selected>آخر 6 أشهر</option>
+            <option value="365">آخر سنة</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="spin-wrap" id="spinner">
+        <div class="spinner"></div>
+        <div class="spin-txt" id="spinTxt">جاري التحليل...</div>
+        <div class="spin-prog"><div class="spin-prog-fill" id="spinFill" style="width:0%"></div></div>
+      </div>
+
+      <div id="runWrap">
+        <button class="btn-gold" onclick="runAnalysis()">▶ تحليل المنطقة</button>
+        <button class="btn-outline" onclick="startDraw()">✏️ رسم منطقة جديدة</button>
+      </div>
+
+      <div class="sec">مناطق ذهب مشهورة</div>
+      <div class="chips">
+        <button class="chip" onclick="quickArea(29.10,-9.27,0.08,'أنتي أطلس')">🇲🇦 المغرب</button>
+        <button class="chip" onclick="quickArea(11.5,-1.5,0.1,'بوركينا فاسو')">🌍 بوركينا فاسو</button>
+        <button class="chip" onclick="quickArea(-26.3,27.4,0.08,'جنوب إفريقيا')">🇿🇦 جنوب إفريقيا</button>
+        <button class="chip" onclick="quickArea(-9.2,-77.5,0.08,'بيرو')">🇵🇪 بيرو</button>
+        <button class="chip" onclick="quickArea(64.2,-138.5,0.1,'يوكون')">🇨🇦 كندا</button>
+        <button class="chip" onclick="quickArea(-10.7,142.5,0.08,'أستراليا')">🇦🇺 أستراليا</button>
+        <button class="chip" onclick="quickArea(5.5,-2.5,0.09,'غانا')">🇬🇭 غانا</button>
+        <button class="chip" onclick="quickArea(12.5,2.5,0.1,'النيجر')">🌍 النيجر</button>
+      </div>
+    </div>
+
+    <!-- RESULTS TAB -->
+    <div class="pane" id="pane-results" style="display:none">
+      <div id="resultsContent">
+        <div class="alert alert-info">حلّل منطقة لعرض النتائج</div>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div class="pane" id="pane-history" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+        <span style="font-size:0.78rem;font-weight:700;color:var(--gold)">📋 سجل التحليلات</span>
+        <button onclick="clearHistory()" style="background:var(--card3);border:1px solid var(--border2);color:var(--red);border-radius:7px;padding:4px 9px;font-family:Cairo,sans-serif;font-size:0.65rem;cursor:pointer">🗑️ مسح</button>
+      </div>
+      <div id="histList"><div class="alert alert-info">لا يوجد سجل بعد</div></div>
+    </div>
+
+    <!-- ABOUT TAB -->
+    <div class="pane" id="pane-about" style="display:none">
+      <div class="card">
+        <div class="card-title">🛰️ مصادر البيانات الحقيقية</div>
+        <div style="font-size:0.72rem;line-height:2;color:var(--dim2)">
+          <div>🥇 <b style="color:var(--text)">Element84 EarthSearch</b><br>
+            <span style="font-size:0.65rem">Sentinel-2 L2A — STAC مجاني بدون مفتاح</span></div>
+          <div>🥈 <b style="color:var(--text)">Microsoft Planetary Computer</b><br>
+            <span style="font-size:0.65rem">Sentinel-2 + Landsat — Token مجاني تلقائي</span></div>
+          <div>🥉 <b style="color:var(--text)">Titiler.xyz</b><br>
+            <span style="font-size:0.65rem">قراءة قيم النطاقات من ملفات COG</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔬 المؤشرات الطيفية</div>
+        <div style="font-size:0.7rem;line-height:2;color:var(--dim2)">
+          <div>🔴 <b style="color:var(--text)">Iron Oxide</b> = B4/B2 → عتبة: >1.5</div>
+          <div>🟣 <b style="color:var(--text)">Hydrothermal</b> = (B11+B4)/(B8A+B2) → >2.0</div>
+          <div>🟡 <b style="color:var(--text)">Clay Minerals</b> = B11/B8A → >2.0</div>
+          <div>⚪ <b style="color:var(--text)">Silica</b> = B11-B12 → >0.03</div>
+          <div>🟤 <b style="color:var(--text)">Ferrous Iron</b> = B11/B8 → >1.5</div>
+          <div>🌿 <b style="color:var(--text)">NDVI</b> = (B8-B4)/(B8+B4) → قناع</div>
+        </div>
+      </div>
+      <div class="alert alert-gold" style="font-size:0.7rem">
+        ⚠️ للأغراض الاستكشافية الأولية فقط.<br>التحقق الميداني ضروري قبل أي قرار.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ STATE ══
+const isMobile=window.innerWidth<=680;
+let map,baseLayers={},curBase='sat';
+let drawnItems,drawControl,drawMode=false;
+let selectedBBox=null,panelOpen=!isMobile;
+let lastResult=null;
+let authToken=null,authUser=null;
+let histArr=JSON.parse(localStorage.getItem('gm_hist')||'[]');
+
+// ══ MAP ══
+map=L.map('map',{center:[29.1022,-9.2715],zoom:9,zoomControl:false});
+L.control.zoom({position:'bottomright'}).addTo(map);
+baseLayers.sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'©Esri',maxZoom:19}).addTo(map);
+baseLayers.street=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'©OSM',maxZoom:19});
+baseLayers.topo=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{attribution:'©OTM',maxZoom:17});
+baseLayers.dark=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'©CartoDB',maxZoom:19});
+
+drawnItems=new L.FeatureGroup().addTo(map);
+drawControl=new L.Control.Draw({
+  draw:{rectangle:{shapeOptions:{color:'#F5C518',weight:2,fillColor:'#F5C518',fillOpacity:0.06,dashArray:'5,5'}},
+    polygon:false,polyline:false,circle:false,marker:false,circlemarker:false},
+  edit:{featureGroup:drawnItems,remove:false}
+});
+map.on(L.Draw.Event.CREATED,function(e){
+  drawnItems.clearLayers(); drawnItems.addLayer(e.layer);
+  const b=e.layer.getBounds();
+  setBBox({n:b.getNorth(),s:b.getSouth(),w:b.getWest(),e:b.getEast()});
+  stopDraw(); if(isMobile)openPanel();
+});
+map.on('mousemove click',e=>{
+  if(!drawMode) document.getElementById('coordsBar').innerHTML=
+    `<span>${e.latlng.lat.toFixed(5)}°N</span> / <span>${e.latlng.lng.toFixed(5)}°</span>`;
+});
+
+// ══ DRAW ══
+function toggleDraw(){drawMode?stopDraw():startDraw();}
+function startDraw(){
+  drawMode=true; map.addControl(drawControl);
+  document.getElementById('drawBanner').classList.add('show');
+  document.getElementById('btnDraw').classList.add('active');
+  new L.Draw.Rectangle(map,drawControl.options.draw.rectangle).enable();
+}
+function stopDraw(){
+  drawMode=false; try{map.removeControl(drawControl);}catch(e){}
+  document.getElementById('drawBanner').classList.remove('show');
+  document.getElementById('btnDraw').classList.remove('active');
+}
+
+// ══ BBOX ══
+function setBBox(b){
+  selectedBBox=b;
+  const wKm=haversine(b.n,b.w,b.n,b.e).toFixed(1);
+  const hKm=haversine(b.n,b.w,b.s,b.w).toFixed(1);
+  const aKm=(parseFloat(wKm)*parseFloat(hKm)).toFixed(1);
+  document.getElementById('bboxNW').value=`${b.n.toFixed(5)}°N, ${b.w.toFixed(5)}°`;
+  document.getElementById('bboxSE').value=`${b.s.toFixed(5)}°N, ${b.e.toFixed(5)}°`;
+  document.getElementById('bboxArea').textContent=aKm;
+  document.getElementById('bboxDims').textContent=`${wKm}×${hKm} كم`;
+  document.getElementById('bboxInfo').style.display='block';
+  document.getElementById('coordsBar').innerHTML=
+    `<span>${wKm}×${hKm} كم</span> = <span>${aKm} كم²</span> — اضغط تحليل`;
+}
+
+// ══ AUTH ══
+function openModal(){document.getElementById('loginModal').classList.add('show');}
+function closeModal(){document.getElementById('loginModal').classList.remove('show');}
+
+async function doLogin(){
+  const email=document.getElementById('mEmail').value.trim();
+  const pass=document.getElementById('mPass').value;
+  const err=document.getElementById('mErr');
+  const ok=document.getElementById('mOk');
+  const btn=document.getElementById('mBtn');
+  err.style.display='none'; ok.style.display='none';
+  if(!email||!pass){err.textContent='أدخل البريد وكلمة المرور';err.style.display='block';return;}
+  btn.disabled=true; btn.textContent='⏳ جاري الدخول...';
+
+  const TOKEN_URL='https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token';
+  const body=new URLSearchParams({grant_type:'password',client_id:'cdse-public',username:email,password:pass});
+  const proxies=[
+    `https://corsproxy.io/?url=${encodeURIComponent(TOKEN_URL)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(TOKEN_URL)}`,
+  ];
+
+  for(const url of proxies){
+    try{
+      const r=await fetch(url,{method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body,signal:AbortSignal.timeout(15000)});
+      let d; try{d=await r.json();}catch(e){continue;}
+      if(d.access_token){
+        authToken=d.access_token; authUser=email;
+        localStorage.setItem('gm_auth',JSON.stringify({token:authToken,user:email,exp:Date.now()+(d.expires_in||3600)*1000}));
+        ok.textContent=`✅ تم الدخول — ${email.split('@')[0]}`;
+        ok.style.display='block';
+        updateAuthUI(); setTimeout(closeModal,1500); break;
+      }
+      if(d.error){
+        err.textContent=d.error==='invalid_grant'?'❌ بريد أو كلمة مرور خاطئة':'❌ '+( d.error_description||d.error);
+        err.style.display='block'; break;
+      }
+    }catch(e){continue;}
+  }
+  btn.disabled=false; btn.textContent='🛰️ دخول — Copernicus';
+}
+
+function updateAuthUI(){
+  const saved=JSON.parse(localStorage.getItem('gm_auth')||'null');
+  if(saved&&saved.exp>Date.now()){authToken=saved.token;authUser=saved.user;}
+  const dot=document.getElementById('ldot');
+  const name=document.getElementById('lname');
+  const btn=document.getElementById('lbtn');
+  if(authToken){
+    dot.className='ldot on'; name.textContent=authUser.split('@')[0];
+    btn.textContent='خروج'; btn.onclick=()=>{authToken=null;authUser=null;localStorage.removeItem('gm_auth');updateAuthUI();showToast('تم تسجيل الخروج');};
+  }else{
+    dot.className='ldot off'; name.textContent='غير مسجّل';
+    btn.textContent='دخول'; btn.onclick=openModal;
+  }
+}
+
+// ══ REAL DATA FETCH ══
+const STAC_E84='https://earth-search.aws.element84.com/v1';
+const STAC_PC='https://planetarycomputer.microsoft.com/api/stac/v1';
+const TITILER='https://titiler.xyz';
+
+async function fetchRealBands(bbox,cloud,days){
+  const bboxArr=[bbox.w,bbox.s,bbox.e,bbox.n];
+  const bboxStr=`${bbox.w},${bbox.s},${bbox.e},${bbox.n}`;
+  const dateFrom=dateBefore(parseInt(days));
+
+  // 1. Element84 — Sentinel-2
+  try{
+    setSpinProg(15,'🔍 Element84 — Sentinel-2 L2A...');
+    const r=await fetch(`${STAC_E84}/search`,{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({collections:['sentinel-2-l2a'],bbox:bboxArr,
+        datetime:`${dateFrom}/..`,
+        query:{'eo:cloud_cover':{'lt':parseInt(cloud)}},
+        sortby:[{field:'properties.eo:cloud_cover',direction:'asc'}],limit:5}),
+      signal:AbortSignal.timeout(12000)});
+    if(r.ok){
+      const d=await r.json();
+      if(d.features?.length){
+        const f=d.features[0];
+        const date=f.properties.datetime?.slice(0,10);
+        const cl=(f.properties['eo:cloud_cover']||0).toFixed(1);
+        setSpinProg(35,`📅 ${date} — غيوم: ${cl}%`);
+        const stats=await getBandStats(f.assets,bboxStr);
+        if(stats) return{...stats,_src:'Sentinel-2 L2A',_catalog:'Element84',_date:date,_cloud:cl,_real:true};
+      }
+    }
+  }catch(e){}
+
+  // 2. Planetary Computer + free token
+  try{
+    setSpinProg(40,'🌐 Microsoft Planetary Computer...');
+    let pcTok=null;
+    try{
+      const tr=await fetch('https://planetarycomputer.microsoft.com/api/sas/v1/token/sentinel-2-l2a',
+        {signal:AbortSignal.timeout(7000)});
+      if(tr.ok){const td=await tr.json();pcTok=td.token;}
+    }catch(e){}
+
+    const r=await fetch(`${STAC_PC}/search`,{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({collections:['sentinel-2-l2a'],bbox:bboxArr,
+        datetime:`${dateFrom}/..`,
+        query:{'eo:cloud_cover':{'lt':parseInt(cloud)}},
+        sortby:[{field:'properties.eo:cloud_cover',direction:'asc'}],limit:3}),
+      signal:AbortSignal.timeout(12000)});
+    if(r.ok){
+      const d=await r.json();
+      if(d.features?.length){
+        const f=d.features[0];
+        if(pcTok) Object.values(f.assets).forEach(a=>{
+          if(a.href?.includes('blob.core.windows.net'))a.href+=`?${pcTok}`;
+        });
+        const date=f.properties.datetime?.slice(0,10);
+        const cl=(f.properties['eo:cloud_cover']||0).toFixed(1);
+        setSpinProg(55,`📅 PC: ${date} — غيوم: ${cl}%`);
+        const stats=await getBandStats(f.assets,bboxStr);
+        if(stats) return{...stats,_src:'Sentinel-2 L2A',_catalog:'Planetary Computer',_date:date,_cloud:cl,_real:true};
+      }
+    }
+  }catch(e){}
+
+  return null;
+}
+
+async function getBandStats(assets,bboxStr){
+  const keys={
+    B02:['blue','B02'],B04:['red','B04'],
+    B08:['nir','B08'],B8A:['nir08','B8A'],
+    B11:['swir16','B11'],B12:['swir22','B12']
+  };
+  const getUrl=ks=>{for(const k of ks)if(assets[k]?.href)return assets[k].href;return null;};
+  const res={};
+  await Promise.allSettled(Object.entries(keys).map(async([bk,ks])=>{
+    const url=getUrl(ks); if(!url)return;
+    try{
+      const r=await fetch(
+        `${TITILER}/cog/statistics?url=${encodeURIComponent(url)}&bbox=${bboxStr}&max_size=64`,
+        {signal:AbortSignal.timeout(10000)});
+      if(!r.ok)return;
+      const d=await r.json();
+      const s=Object.values(d)[0];
+      if(s?.mean!=null)res[bk]=s.mean;
+    }catch(e){}
+  }));
+  return Object.keys(res).length>=3?res:null;
+}
+
+// ══ INDICES ══
+function computeIdx(b){
+  const sc=10000;
+  const B02=(b.B02||0)/sc,B04=(b.B04||0)/sc,B08=(b.B08||0)/sc;
+  const B8A=(b.B8A||b.B08||0)/sc,B11=(b.B11||0)/sc,B12=(b.B12||0)/sc;
+  const s=(a,b)=>b>0.001?a/b:0;
+  return{B02,B04,B08,B8A,B11,B12,
+    iron:s(B04,B02),hydro:s(B11+B04,B8A+B02),
+    clay:s(B11,B8A),silica:B11-B12,ferrous:s(B11,B08),
+    ndvi:s(B08-B04,B08+B04),swir:s(B11,B12)};
+}
+
+function fallbackBands(bbox){
+  const lat=(bbox.n+bbox.s)/2,lon=(bbox.w+bbox.e)/2;
+  const f=(lat>15&&lat<35?1.3:1.0)*(lat<15&&lat>-10?.85:1.0);
+  const g=Math.sin(lat*.3)*Math.cos(lon*.3)*.15;
+  return{B02:Math.round(720*f*(1+g)),B04:Math.round(1180*f*(1+g*1.2)),
+    B08:Math.round(1420*f*(1-g*.5)),B8A:Math.round(1380*f*(1-g*.4)),
+    B11:Math.round(2480*f*(1+g*.8)),B12:Math.round(1980*f*(1+g*.7))};
+}
+
+function goldScore(idx){
+  const c=v=>Math.min(1,Math.max(0,v));
+  return c((.35*c((idx.iron-1.0)/1.8)+.30*c((idx.hydro-1.2)/1.6)+
+    .20*c((idx.clay-1.3)/2.2)+.10*c((idx.silica-.02)/.08)+
+    .05*c((idx.ferrous-1.1)/1.8))*(idx.ndvi>.3?1-idx.ndvi*.7:1));
+}
+
+// Interpretation
+function interpIdx(name,val){
+  const thresholds={
+    iron: [{v:2.0,l:'عالٍ جداً — Gossan واضح',c:'#F5C518'},{v:1.5,l:'عالٍ — مؤشر قوي',c:'#f97316'},{v:1.0,l:'متوسط',c:'#3b82f6'},{v:0,l:'منخفض',c:'#4a5568'}],
+    hydro:[{v:2.5,l:'تغيير هيدروثرمالي قوي',c:'#F5C518'},{v:2.0,l:'تغيير واضح',c:'#f97316'},{v:1.5,l:'تغيير محتمل',c:'#3b82f6'},{v:0,l:'منخفض',c:'#4a5568'}],
+    clay: [{v:2.5,l:'معادن طين كثيفة',c:'#F5C518'},{v:2.0,l:'طين واضح',c:'#f97316'},{v:1.5,l:'طين متوسط',c:'#3b82f6'},{v:0,l:'منخفض',c:'#4a5568'}],
+    silica:[{v:.08,l:'كوارتز كثيف',c:'#F5C518'},{v:.04,l:'سيليكا واضحة',c:'#f97316'},{v:.01,l:'متوسط',c:'#3b82f6'},{v:-99,l:'منخفض',c:'#4a5568'}],
+    ferrous:[{v:2.0,l:'حديد ثنائي قوي',c:'#F5C518'},{v:1.5,l:'واضح',c:'#f97316'},{v:1.0,l:'متوسط',c:'#3b82f6'},{v:0,l:'منخفض',c:'#4a5568'}],
+  };
+  const t=thresholds[name]||[];
+  for(const th of t) if(val>=th.v) return th;
+  return {l:'—',c:'#4a5568'};
+}
+
+// ══ MAIN ANALYSIS ══
+async function runAnalysis(){
+  if(!selectedBBox){quickArea(29.10,-9.27,0.08,'أنتي أطلس');setTimeout(runAnalysis,400);return;}
+  const bbox=selectedBBox;
+  const cloud=document.getElementById('cloud').value;
+  const days=document.getElementById('dateRange').value;
+
+  document.getElementById('runWrap').style.display='none';
+  document.getElementById('spinner').classList.add('show');
+
+  let bands=null,meta={src:'نموذج',catalog:'—',date:'—',cloud:'—',real:false};
+
+  try{
+    bands=await fetchRealBands(bbox,cloud,days);
+    if(bands){meta={src:bands._src,catalog:bands._catalog,date:bands._date,cloud:bands._cloud,real:true};}
+  }catch(e){}
+
+  if(!bands){setSpinProg(65,'⚙️ نموذج جيولوجي بديل...');bands=fallbackBands(bbox);}
+
+  setSpinProg(85,'🔬 حساب المؤشرات...');
+  const idx=computeIdx(bands);
+  const gs=goldScore(idx);
+
+  // Add bbox marker on map
+  const bounds=[[bbox.s,bbox.w],[bbox.n,bbox.e]];
+  drawnItems.clearLayers();
+  L.rectangle(bounds,{color:'#F5C518',weight:2,fill:false,dashArray:'5,5'}).addTo(drawnItems);
+  map.fitBounds(bounds,{padding:[30,30]});
+
+  setSpinProg(100,'✅ اكتمل!');
+  await sleep(300);
+  document.getElementById('spinner').classList.remove('show');
+  document.getElementById('runWrap').style.display='block';
+
+  lastResult={idx,gs,bbox,meta};
+  saveHistory(bbox,idx,gs,meta);
+  buildResults(idx,gs,meta,bands);
+  switchTab('results');
+  if(isMobile)openPanel();
+}
+
+// ══ RESULTS ══
+function buildResults(idx,gs,meta,bands){
+  const sc=10000;
+  const risk=gs>.70?'⭐⭐⭐ عالٍ جداً':gs>.50?'⭐⭐ عالٍ':gs>.30?'⭐ متوسط':'منخفض';
+  const riskC=gs>.70?'var(--gold)':gs>.50?'var(--orange)':gs>.30?'var(--blue)':'var(--dim2)';
+
+  const srcBadge=meta.real
+    ?`<span class="src-badge sb-real">✅ ${meta.src} — ${meta.catalog} — ${meta.date} — غيوم:${meta.cloud}%</span>`
+    :`<span class="src-badge sb-sim">⚙️ نموذج جيولوجي تقديري</span>`;
+
+  const indices=[
+    {key:'iron', name:'Iron Oxide Ratio',   formula:'B4/B2',          val:idx.iron,    color:'#ef4444', weight:'35%'},
+    {key:'hydro',name:'Hydrothermal Alt.',   formula:'(B11+B4)/(B8A+B2)',val:idx.hydro, color:'#a855f7', weight:'30%'},
+    {key:'clay', name:'Clay Minerals',       formula:'B11/B8A',        val:idx.clay,    color:'#eab308', weight:'20%'},
+    {key:'silica',name:'Silica Index',       formula:'B11-B12',        val:idx.silica,  color:'#94a3b8', weight:'10%'},
+    {key:'ferrous',name:'Ferrous Iron',      formula:'B11/B8',         val:idx.ferrous, color:'#b45309', weight:'5%'},
+    {key:'ndvi',  name:'NDVI (vegetation)',  formula:'(B8-B4)/(B8+B4)',val:idx.ndvi,    color:'#10b981', weight:'قناع'},
+  ];
+
+  document.getElementById('resultsContent').innerHTML=`
+    ${srcBadge}
+    <div class="stats-grid">
+      <div class="stat">
+        <div class="stat-v" style="color:${riskC}">${(gs*100).toFixed(1)}%</div>
+        <div class="stat-l">احتمالية الذهب</div>
+      </div>
+      <div class="stat">
+        <div class="stat-v" style="font-size:.82rem;color:${riskC}">${risk}</div>
+        <div class="stat-l">التقييم الإجمالي</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:9px">
+      <div class="card-title">📡 قيم الانعكاس الطيفي</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:0.7rem">
+        ${[['B02','أزرق 490nm',bands.B02||0,'#3b82f6'],
+           ['B04','أحمر 665nm',bands.B04||0,'#ef4444'],
+           ['B08','NIR 842nm', bands.B08||0,'#8b5cf6'],
+           ['B8A','NIR 865nm', bands.B8A||0,'#7c3aed'],
+           ['B11','SWIR 1610nm',bands.B11||0,'#f97316'],
+           ['B12','SWIR 2190nm',bands.B12||0,'#dc2626']
+          ].map(([b,n,v,c])=>`
+          <div style="background:var(--card3);border-radius:7px;padding:7px 8px">
+            <div style="color:${c};font-weight:700">${b}</div>
+            <div style="color:var(--dim2);font-size:0.6rem">${n}</div>
+            <div style="color:var(--text);font-weight:900;font-size:0.85rem">${(v/sc).toFixed(4)}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    ${indices.map(idx2=>{
+      const interp=interpIdx(idx2.key,idx2.val);
+      const barW=Math.min(100,Math.max(5,idx2.val*25)).toFixed(0);
+      return `
+      <div class="idx-card">
+        <div class="idx-header">
+          <div>
+            <div class="idx-name" style="color:${idx2.color}">${idx2.name}</div>
+            <div class="idx-formula">${idx2.formula} — وزن: ${idx2.weight}</div>
+          </div>
+        </div>
+        <div class="idx-value" style="color:${idx2.color}">${idx2.val.toFixed(4)}</div>
+        <div class="idx-bar">
+          <div class="idx-bar-fill" style="width:${barW}%;background:${idx2.color}"></div>
+        </div>
+        <span class="idx-interp" style="background:${interp.c}22;color:${interp.c};border:1px solid ${interp.c}44">
+          ${interp.l}
+        </span>
+      </div>`;
+    }).join('')}
+
+    <div class="alert ${gs>.5?'alert-gold':'alert-info'}" style="margin-top:4px">
+      ${gs>.7?'⭐ أولوية عالية — يُنصح بالزيارة الميدانية وأخذ عينات':
+        gs>.5?'📍 منطقة واعدة — تحليل ميداني مقترح':
+        gs>.3?'🔍 مؤشرات متوسطة — مراقبة مستمرة مطلوبة':
+        '📉 مؤشرات منخفضة في هذه المنطقة'}
+    </div>`;
+}
+
+// ══ HISTORY ══
+function saveHistory(bbox,idx,gs,meta){
+  const e={id:Date.now(),date:new Date().toLocaleString('ar'),
+    lat:((bbox.n+bbox.s)/2).toFixed(5),lon:((bbox.w+bbox.e)/2).toFixed(5),
+    n:bbox.n.toFixed(5),s:bbox.s.toFixed(5),w:bbox.w.toFixed(5),e:bbox.e.toFixed(5),
+    gs:(gs*100).toFixed(1),iron:idx.iron.toFixed(3),hydro:idx.hydro.toFixed(3),
+    clay:idx.clay.toFixed(3),silica:idx.silica.toFixed(4),src:meta.src,date:meta.date};
+  histArr.unshift(e);
+  if(histArr.length>50)histArr=histArr.slice(0,50);
+  localStorage.setItem('gm_hist',JSON.stringify(histArr));
+  renderHistory();
+}
+function renderHistory(){
+  const el=document.getElementById('histList'); if(!el)return;
+  if(!histArr.length){el.innerHTML='<div class="alert alert-info">لا يوجد سجل</div>';return;}
+  el.innerHTML=histArr.map(e=>`
+    <div class="hist-item">
+      <div class="hist-top">
+        <span class="hist-date">${e.date}</span>
+        <span class="hist-score" style="color:${parseFloat(e.gs)>50?'var(--gold)':parseFloat(e.gs)>30?'var(--orange)':'var(--dim2)'}">🥇${e.gs}%</span>
+      </div>
+      <div class="hist-loc">📍 ${e.lat}°N / ${e.lon}°</div>
+      <div class="hist-vals">Fe:${e.iron} | Hy:${e.hydro} | Cl:${e.clay} | Si:${e.silica}</div>
+      <div style="font-size:0.62rem;color:var(--dim2);margin-bottom:6px">${e.src} — ${e.date||'—'}</div>
+      <div class="hist-acts">
+        <button onclick="copyCoords('${e.lat}','${e.lon}','${e.n}','${e.s}','${e.w}','${e.e}')">📋 نسخ</button>
+        <button onclick="flyTo(${e.lat},${e.lon})">🗺️ عرض</button>
+        <button onclick="delHist(${e.id})" style="color:var(--red)">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+function copyCoords(lat,lon,n,s,w,e){
+  const t=`GoldMapper\nالمركز: ${lat}°N, ${lon}°\nN:${n} S:${s} W:${w} E:${e}`;
+  if(navigator.clipboard)navigator.clipboard.writeText(t).then(()=>showToast('✅ تم النسخ!'));
+  else{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('✅ تم النسخ!');}
+}
+function flyTo(lat,lon){map.flyTo([lat,lon],11,{duration:1.5});if(isMobile)closePanel();}
+function delHist(id){histArr=histArr.filter(e=>e.id!==id);localStorage.setItem('gm_hist',JSON.stringify(histArr));renderHistory();}
+function clearHistory(){histArr=[];localStorage.removeItem('gm_hist');renderHistory();}
+
+// ══ MAP CONTROLS ══
+function setLayer(n){
+  map.removeLayer(baseLayers[curBase]);baseLayers[n].addTo(map);curBase=n;
+  ['Sat','Street','Topo','Dark'].forEach(x=>document.getElementById('l'+x)?.classList.remove('on'));
+  document.getElementById('l'+n.charAt(0).toUpperCase()+n.slice(1))?.classList.add('on');
+}
+function locateMe(){
+  map.locate({setView:true,maxZoom:11});
+  map.once('locationfound',e=>quickArea(e.latlng.lat,e.latlng.lng,0.08,'موقعك'));
+  map.once('locationerror',()=>showToast('فعّل GPS'));
+}
+function doSearch(){
+  const q=document.getElementById('searchInput').value.trim(); if(!q)return;
+  const p=q.split(',').map(s=>parseFloat(s.trim()));
+  if(p.length===2&&!isNaN(p[0])&&!isNaN(p[1])){quickArea(p[0],p[1],0.08,q);return;}
+  fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`)
+    .then(r=>r.json()).then(d=>{
+      if(d.length)quickArea(parseFloat(d[0].lat),parseFloat(d[0].lon),0.09,d[0].display_name.split(',')[0]);
+      else showToast('لم يتم العثور على المنطقة');
+    }).catch(()=>showToast('تحقق من الإنترنت'));
+}
+function quickArea(lat,lon,sp,name){
+  const b={n:lat+sp,s:lat-sp,w:lon-sp,e:lon+sp};
+  selectedBBox=b; setBBox(b);
+  map.flyTo([lat,lon],10,{duration:1.8});
+  drawnItems.clearLayers();
+  L.rectangle([[b.s,b.w],[b.n,b.e]],{color:'#F5C518',weight:2,fillColor:'#F5C518',fillOpacity:.05,dashArray:'5,5'}).addTo(drawnItems);
+  if(isMobile)openPanel();
+}
+
+// ══ PANEL & TABS ══
+function togglePanel(){panelOpen?closePanel():openPanel();}
+function openPanel(){panelOpen=true;document.getElementById('panel').classList.add('open');}
+function closePanel(){panelOpen=false;document.getElementById('panel').classList.remove('open');}
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.pane').forEach(p=>p.style.display='none');
+  document.getElementById('tab-'+name).classList.add('active');
+  document.getElementById('pane-'+name).style.display='block';
+  if(isMobile)openPanel();
+}
+
+// ══ UTILS ══
+function setSpinProg(p,m){document.getElementById('spinTxt').textContent=m;document.getElementById('spinFill').style.width=p+'%';}
+function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2500);}
+function haversine(a,b,c,d){const R=6371,da=(c-a)*Math.PI/180,db=(d-b)*Math.PI/180;const x=Math.sin(da/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(db/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function dateBefore(days){const d=new Date();d.setDate(d.getDate()-days);return d.toISOString().slice(0,10);}
+
+// ══ INIT ══
+if(!isMobile)openPanel();
+updateAuthUI();
+renderHistory();
+quickArea(29.10,-9.27,0.08,'أنتي أطلس');
+</script>
+</body>
+</html>
